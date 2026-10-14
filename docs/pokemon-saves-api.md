@@ -58,6 +58,31 @@ Jeux Switch connus aujourd'hui. Récupère toujours la liste à jour avec `GET /
 
 > Ces title IDs n'ont pas encore été vérifiés sur une vraie console. Si `GET /games` ne contient pas le title ID d'un jeu installé, ignore ce jeu et affiche un avertissement. Ne plante pas.
 
+### Saves d'émulateur DS (melonDS)
+
+Le client peut aussi sauvegarder les saves `.sav` de melonDS. Il identifie le jeu par son **code jeu**, et non par un title ID.
+
+1. Lis les 4 caractères ASCII à l'offset `0x0C` de l'en-tête de la ROM `.nds` (par exemple `CPUF` pour Platine FR).
+2. Ignore le 4e caractère : c'est la région.
+3. Cherche les 3 premiers caractères dans le champ `ndsGameCodes` de `GET /games`. La comparaison ignore la casse.
+4. Envoie le `.sav` **brut** (pas de ZIP) avec `PUT /backups/<id du jeu>/<slot>`, par exemple `PUT /backups/platinum/melonds`.
+
+Si aucun jeu du catalogue ne correspond, ignore la ROM. Ne plante pas.
+
+Codes connus aujourd'hui. Récupère toujours la liste à jour avec `GET /games` :
+
+| id | Jeu | Code jeu | Lecture auto côté serveur |
+| --- | --- | --- | --- |
+| `diamond` | Diamant | `ADA` | non (stockage seulement) |
+| `pearl` | Perle | `APA` | non (stockage seulement) |
+| `platinum` | Platine | `CPU` | non (stockage seulement) |
+| `heartgold` | HeartGold | `IPK` | non (stockage seulement) |
+| `soulsilver` | SoulSilver | `IPG` | non (stockage seulement) |
+| `black` | Noir | `IRB` | oui |
+| `white` | Blanc | `IRA` | oui |
+| `black2` | Noir 2 | `IRE` | non (stockage seulement) |
+| `white2` | Blanc 2 | `IRD` | non (stockage seulement) |
+
 ### Slot de backup
 
 Un **slot** est un nom libre qui identifie « la » save de backup d'un jeu, par exemple `switch`.
@@ -108,12 +133,14 @@ Catalogue des jeux.
     "platform": "Nintendo Switch",
     "year": 2019,
     "autoRead": true,
-    "switchTitleId": "01008DB008C2C000"
+    "switchTitleId": "01008DB008C2C000",
+    "ndsGameCodes": []
   }
 ]
 ```
 
-`switchTitleId` vaut `null` pour les jeux qui ne sont pas sur Switch.
+- `switchTitleId` vaut `null` pour les jeux qui ne sont pas sur Switch.
+- `ndsGameCodes` liste les codes jeu Nintendo DS (3 caractères, sans la région). Le tableau est vide pour les autres jeux. Exemple pour Platine : `"ndsGameCodes": ["CPU"]`.
 
 ### 3.2 `GET /backups`
 

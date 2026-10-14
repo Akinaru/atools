@@ -14,6 +14,8 @@ export type Game = {
   format?: SaveFormat;
   /** Nintendo Switch title ID, so a Switch homebrew can upload without knowing our game ids. */
   switchTitleId?: string;
+  /** Nintendo DS game codes (ROM header 0x0C), first 3 characters only: the 4th is the region. */
+  ndsGameCodes?: string[];
 };
 
 export const GAMES: Game[] = [
@@ -28,15 +30,15 @@ export const GAMES: Game[] = [
   { id: "emerald", name: "Émeraude", gen: 3, platform: "Game Boy Advance", year: 2004, colors: ["#10b981", "#065f46"], format: "gen3-e" },
   { id: "firered", name: "Rouge Feu", gen: 3, platform: "Game Boy Advance", year: 2004, colors: ["#f97316", "#b91c1c"], format: "gen3-frlg" },
   { id: "leafgreen", name: "Vert Feuille", gen: 3, platform: "Game Boy Advance", year: 2004, colors: ["#84cc16", "#166534"], format: "gen3-frlg" },
-  { id: "diamond", name: "Diamant", gen: 4, platform: "Nintendo DS", year: 2006, colors: ["#93c5fd", "#3b5998"] },
-  { id: "pearl", name: "Perle", gen: 4, platform: "Nintendo DS", year: 2006, colors: ["#f9a8d4", "#9d4b73"] },
-  { id: "platinum", name: "Platine", gen: 4, platform: "Nintendo DS", year: 2008, colors: ["#a1a1aa", "#3f3f46"] },
-  { id: "heartgold", name: "HeartGold", gen: 4, platform: "Nintendo DS", year: 2009, colors: ["#fbbf24", "#b45309"] },
-  { id: "soulsilver", name: "SoulSilver", gen: 4, platform: "Nintendo DS", year: 2009, colors: ["#cbd5e1", "#475569"] },
-  { id: "black", name: "Noir", gen: 5, platform: "Nintendo DS", year: 2010, colors: ["#3f3f46", "#09090b"], format: "gen5-bw" },
-  { id: "white", name: "Blanc", gen: 5, platform: "Nintendo DS", year: 2010, colors: ["#f4f4f5", "#a1a1aa"], format: "gen5-bw" },
-  { id: "black2", name: "Noir 2", gen: 5, platform: "Nintendo DS", year: 2012, colors: ["#27272a", "#1e3a8a"] },
-  { id: "white2", name: "Blanc 2", gen: 5, platform: "Nintendo DS", year: 2012, colors: ["#fafafa", "#f87171"] },
+  { id: "diamond", name: "Diamant", gen: 4, platform: "Nintendo DS", year: 2006, colors: ["#93c5fd", "#3b5998"], ndsGameCodes: ["ADA"] },
+  { id: "pearl", name: "Perle", gen: 4, platform: "Nintendo DS", year: 2006, colors: ["#f9a8d4", "#9d4b73"], ndsGameCodes: ["APA"] },
+  { id: "platinum", name: "Platine", gen: 4, platform: "Nintendo DS", year: 2008, colors: ["#a1a1aa", "#3f3f46"], ndsGameCodes: ["CPU"] },
+  { id: "heartgold", name: "HeartGold", gen: 4, platform: "Nintendo DS", year: 2009, colors: ["#fbbf24", "#b45309"], ndsGameCodes: ["IPK"] },
+  { id: "soulsilver", name: "SoulSilver", gen: 4, platform: "Nintendo DS", year: 2009, colors: ["#cbd5e1", "#475569"], ndsGameCodes: ["IPG"] },
+  { id: "black", name: "Noir", gen: 5, platform: "Nintendo DS", year: 2010, colors: ["#3f3f46", "#09090b"], format: "gen5-bw", ndsGameCodes: ["IRB"] },
+  { id: "white", name: "Blanc", gen: 5, platform: "Nintendo DS", year: 2010, colors: ["#f4f4f5", "#a1a1aa"], format: "gen5-bw", ndsGameCodes: ["IRA"] },
+  { id: "black2", name: "Noir 2", gen: 5, platform: "Nintendo DS", year: 2012, colors: ["#27272a", "#1e3a8a"], ndsGameCodes: ["IRE"] },
+  { id: "white2", name: "Blanc 2", gen: 5, platform: "Nintendo DS", year: 2012, colors: ["#fafafa", "#f87171"], ndsGameCodes: ["IRD"] },
   { id: "x", name: "X", gen: 6, platform: "Nintendo 3DS", year: 2013, colors: ["#2563eb", "#1e1b4b"], format: "gen6-xy" },
   { id: "y", name: "Y", gen: 6, platform: "Nintendo 3DS", year: 2013, colors: ["#dc2626", "#4c0519"], format: "gen6-xy" },
   { id: "omegaruby", name: "Rubis Oméga", gen: 6, platform: "Nintendo 3DS", year: 2014, colors: ["#b91c1c", "#450a0a"], format: "gen6-oras" },

@@ -112,7 +112,7 @@ export const api: ApiRoute[] = [
     path: "games",
     description: "Catalogue des jeux (id, génération, lecture auto, title ID Switch).",
     handler: () =>
-      json(GAMES.map(({ id, name, gen, platform, year, format, switchTitleId }) => ({ id, name: `Pokémon ${name}`, gen, platform, year, autoRead: !!format, switchTitleId: switchTitleId ?? null }))),
+      json(GAMES.map(({ id, name, gen, platform, year, format, switchTitleId, ndsGameCodes }) => ({ id, name: `Pokémon ${name}`, gen, platform, year, autoRead: !!format, switchTitleId: switchTitleId ?? null, ndsGameCodes: ndsGameCodes ?? [] }))),
   },
 
   // --- Backup (for the Switch app): one save per game and slot, updated in place ---
