@@ -8,6 +8,8 @@ export type ApiRoute = {
   path: string;
   /** One line shown by GET /api (self-documentation). */
   description: string;
+  /** Served without the API key (e.g. device pairing). */
+  public?: boolean;
   handler: (context: ApiContext) => Response | Promise<Response>;
 };
 

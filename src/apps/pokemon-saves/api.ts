@@ -1,4 +1,5 @@
 import { apiError, json, type ApiContext, type ApiRoute } from "@/lib/api";
+import { clientIp, PairingError, pollPairing, startPairing } from "@/lib/pairing";
 import { GAMES, getGame } from "./games";
 import type { Mon } from "./parsers";
 import {
@@ -113,6 +114,42 @@ export const api: ApiRoute[] = [
     description: "Catalogue des jeux (id, génération, lecture auto, title ID Switch).",
     handler: () =>
       json(GAMES.map(({ id, name, gen, platform, year, format, switchTitleId, ndsGameCodes }) => ({ id, name: `Pokémon ${name}`, gen, platform, year, autoRead: !!format, switchTitleId: switchTitleId ?? null, ndsGameCodes: ndsGameCodes ?? [] }))),
+  },
+
+  // --- Device pairing (public): the device shows a code, the user approves it on /apps/pokemon-saves/pair ---
+  {
+    method: "POST",
+    path: "pair",
+    public: true,
+    description: "Démarre un appairage : renvoie un code à saisir sur le site et un pairingId à interroger (sans clé API).",
+    handler: async ({ request }) => {
+      let body: unknown = {};
+      const text = await request.text();
+      if (text.trim()) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          return apiError(400, "Corps JSON invalide.");
+        }
+      }
+      if (typeof body !== "object" || body === null || Array.isArray(body)) return apiError(400, "Corps JSON invalide.");
+      try {
+        return json(startPairing((body as { device?: unknown }).device, clientIp(request.headers)), { status: 201 });
+      } catch (error) {
+        if (error instanceof PairingError) return apiError(error.status, error.message);
+        throw error;
+      }
+    },
+  },
+  {
+    method: "GET",
+    path: "pair/:pairingId",
+    public: true,
+    description: "État d'un appairage : pending, puis approved avec la clé API (une seule fois) (sans clé API).",
+    handler: ({ params }) => {
+      const result = pollPairing(params.pairingId);
+      return result ? json(result) : apiError(404, "Appairage inconnu, expiré ou déjà utilisé.");
+    },
   },
 
   // --- Backup (for the Switch app): one save per game and slot, updated in place ---

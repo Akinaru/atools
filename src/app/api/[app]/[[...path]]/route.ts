@@ -7,14 +7,15 @@ async function handle(request: Request, ctx: RouteContext<"/api/[app]/[[...path]
   const { app: slug, path = [] } = await ctx.params;
   const app = getApp(slug);
   if (!app?.api) return apiError(404, `Aucune API pour « ${slug} ».`);
-  if (!isApiAuthorized(request)) return apiError(401, "Clé API manquante ou invalide.");
+  const match = path.length ? matchRoute(app.api, request.method, path.map(decodeURIComponent)) : null;
+  const isPublic = typeof match === "object" && match?.route.public;
+  if (!isPublic && !(await isApiAuthorized(request))) return apiError(401, "Clé API manquante ou invalide.");
 
   // GET /api/<app> lists the app's routes.
   if (!path.length && request.method === "GET") {
     return json({ app: app.slug, routes: app.api.map(({ method, path, description }) => ({ method, path: `/api/${app.slug}/${path}`, description })) });
   }
 
-  const match = matchRoute(app.api, request.method, path.map(decodeURIComponent));
   if (match === null) return apiError(404, "Route inconnue.");
   if (match === "method-not-allowed") return apiError(405, "Méthode non autorisée.");
   try {

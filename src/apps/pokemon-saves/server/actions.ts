@@ -1,7 +1,10 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revokeDevice } from "@/lib/devices";
+import { approvePairing, clientIp, PairingError } from "@/lib/pairing";
 import { createSave, deleteSave, findGame, getSaveMeta, replaceSaveFile, SaveImportError, updateSave, type ManualInfo, type SaveFile } from "./store";
 
 export type UploadState = { error?: string; message?: string };
@@ -65,4 +68,24 @@ export async function removeSave(id: string) {
   const meta = await getSaveMeta(id);
   await deleteSave(id);
   redirect(meta ? `/apps/pokemon-saves/game/${meta.gameId}` : "/apps/pokemon-saves");
+}
+
+/** Approves a device pairing from the code it shows. */
+export async function approveDevice(_prev: UploadState, formData: FormData): Promise<UploadState> {
+  const code = text(formData, "code");
+  if (!code) return { error: "Saisis le code affiché par l'appareil." };
+  try {
+    // The UI has a single shared password: the user is identified by their IP for the rate limit.
+    const { device } = await approvePairing(code, clientIp(await headers()));
+    refresh();
+    return { message: `« ${device} » est appairé. L'appareil va recevoir sa clé.` };
+  } catch (error) {
+    if (error instanceof PairingError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function removeDevice(id: string) {
+  await revokeDevice(id);
+  refresh();
 }

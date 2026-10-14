@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ConsoleTabs } from "@/components/console/ConsoleTabs";
 import { NavGrid, type NavItem } from "@/components/console/NavGrid";
 import { GAMES, type Game } from "../games";
@@ -61,6 +62,9 @@ export async function HomeView() {
         title="Saves Pokémon"
         subtitle={`${saves.length} save${saves.length > 1 ? "s" : ""} · ${owned.length} jeu${owned.length > 1 ? "x" : ""} · ${pokemonCount} Pokémon`}
       >
+        <Link href={`${BASE}/pair`} className="rounded-full bg-white px-4 py-2 text-sm font-bold text-zinc-700 shadow-sm transition hover:scale-105">
+          Appareils
+        </Link>
         <UploadDialog />
       </PageTitle>
       <ConsoleTabs tabs={tabs} />

@@ -67,6 +67,8 @@ Toutes les routes, sauf `/api/health`, demandent la clé `ATOOLS_API_KEY`. Elle 
 
 Le navigateur connecté avec le mot de passe de l'interface y a aussi accès.
 
+Un appareil peut aussi obtenir sa propre clé par **appairage** : il affiche un code, saisi ensuite sur `/apps/pokemon-saves/pair`. Les clés d'appareil sont stockées hachées dans `data/atools/devices.json`, et cette page permet de les révoquer.
+
 `GET /api` liste toutes les routes de toutes les apps. `GET /api/<slug>` liste celles d'une app.
 
 ### Saves Pokémon (`/api/pokemon-saves`)
@@ -75,7 +77,9 @@ Doc complète pour un client (homebrew Switch) : [`docs/pokemon-saves-api.md`](d
 
 | Méthode | Route | Rôle |
 | --- | --- | --- |
-| GET | `/games` | Catalogue des jeux, avec les title IDs Switch |
+| POST | `/pair` | Démarre l'appairage d'un appareil (public) |
+| GET | `/pair/:pairingId` | État de l'appairage, puis la clé d'appareil une seule fois (public) |
+| GET | `/games` | Catalogue des jeux, avec les title IDs Switch et les codes jeu DS |
 | GET | `/backups` | Saves de backup : `game`, `slot`, `sha256`, `updatedAt` |
 | PUT | `/backups/:game/:slot` | **Ajoute ou met à jour** la save d'un slot |
 | GET | `/saves` (`?game=`, `?slot=`) | Saves avec leur résumé |

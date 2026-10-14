@@ -12,11 +12,13 @@ Ce document se suffit à lui-même : aucun autre fichier n'est nécessaire pour 
 | --- | --- |
 | URL de base | `https://atools.akinaru.fr` (HTTPS obligatoire) |
 | Préfixe de l'API | `/api/pokemon-saves` |
-| Authentification | En-tête `X-API-Key: <clé>` (ou `Authorization: Bearer <clé>`) |
+| Authentification | En-tête `X-API-Key: <clé>` (ou `Authorization: Bearer <clé>`). La clé s'obtient par appairage (voir ci-dessous). |
 | Taille maximale d'une save | 64 Mo |
 | Format des réponses | JSON UTF-8, sauf les téléchargements (binaire) |
 
-La clé API est un secret. Lis-la depuis un fichier de configuration sur la carte SD, par exemple `sdmc:/config/atools-backup/config.ini` :
+La clé API est un secret. Le client l'obtient par **appairage** (section suivante) et l'enregistre sur la carte SD, par exemple dans `sdmc:/config/atools-backup/`. Ne mets jamais la clé dans le code et ne l'affiche jamais à l'écran.
+
+La clé globale `ATOOLS_API_KEY` du serveur fonctionne toujours, par exemple dans un fichier de configuration :
 
 ```ini
 url=https://atools.akinaru.fr
@@ -24,11 +26,54 @@ api_key=xxxxxxxxxxxxxxxx
 slot=switch
 ```
 
-Ne mets jamais la clé dans le code et ne l'affiche jamais à l'écran.
-
 **Vérifier que le serveur répond** : `GET /api/health` est public (sans clé) et renvoie `{"status":"ok"}`.
 
 **Vérifier la clé** : `GET /api/pokemon-saves/games` renvoie `200` si la clé est bonne, `401` sinon.
+
+### Appairage
+
+L'appairage donne au client **sa propre clé API**, sans recopier de clé à la main :
+
+1. Le client demande un code : `POST /api/pokemon-saves/pair`.
+2. Il affiche le code et l'URL `https://atools.akinaru.fr/apps/pokemon-saves/pair`.
+3. L'utilisateur se connecte au site et saisit le code.
+4. Le client interroge `GET /api/pokemon-saves/pair/<pairingId>` toutes les `interval` secondes, jusqu'à recevoir la clé.
+
+Ces deux routes sont **publiques** : elles ne demandent pas de clé API.
+
+**`POST /api/pokemon-saves/pair`**
+
+Corps JSON facultatif : `{"device": "Switch"}`. C'est le nom affiché sur le site, 64 caractères maximum (« Appareil » par défaut).
+
+```json
+201
+{
+  "pairingId": "hhiR94ym8rhgcP8me_HRiQT10MvhACiu_1bOAFcu3wE",
+  "code": "K7M2QX",
+  "expiresAt": "2026-10-14T18:19:12.944Z",
+  "interval": 5
+}
+```
+
+- `pairingId` : secret aléatoire (base64url). Ne l'affiche pas.
+- `code` : 6 caractères parmi `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (sans 0, O, 1, I ni L). Affiche-le, par exemple en `K7M-2QX`. Le site accepte les minuscules et les tirets.
+- `expiresAt` : l'appairage est valable **10 minutes**.
+- `interval` : délai en secondes entre deux appels de polling.
+
+Erreurs : `400` si le corps ou `device` est invalide, `429` au-delà de 10 demandes par minute et par IP.
+
+**`GET /api/pokemon-saves/pair/<pairingId>`**
+
+| Réponse | Sens |
+| --- | --- |
+| `200 {"status": "pending"}` | L'utilisateur n'a pas encore validé : rappelle dans `interval` secondes |
+| `200 {"status": "approved", "apiKey": "<clé>"}` | Validé. La clé n'est renvoyée **qu'une fois** : enregistre-la tout de suite |
+| `404 {"error": "…"}` | Appairage inconnu, expiré ou déjà consommé : recommence l'appairage |
+
+**Clé d'appareil**
+- Elle s'utilise comme la clé globale (`X-API-Key` ou `Authorization: Bearer`), avec les mêmes droits.
+- Le serveur n'en garde que le SHA-256 : une clé perdue ne se récupère pas, il faut appairer de nouveau.
+- La page d'appairage liste les appareils (nom, date d'appairage, dernière utilisation) et permet de les **révoquer**. Une clé révoquée reçoit `401` : le client doit alors proposer un nouvel appairage.
 
 ---
 
@@ -253,12 +298,13 @@ Toute erreur renvoie un JSON `{ "error": "message en français" }`.
 | --- | --- |
 | `400` | Paramètre invalide : jeu inconnu, slot invalide, fichier vide ou de plus de 64 Mo, champ `file` manquant |
 | `401` | Clé API absente ou invalide |
-| `404` | Save, version ou route inconnue |
+| `404` | Save, version, appairage ou route inconnue |
 | `405` | Méthode non autorisée sur cette route |
+| `429` | Trop de demandes d'appairage (10 par minute et par IP) |
 | `500` | Erreur serveur : réessayer plus tard |
 
 Pour le client :
-- **401** : arrête tout et indique « clé API invalide ».
+- **401** : arrête tout et indique « clé API invalide ». Avec une clé d'appareil, propose un nouvel appairage.
 - **400** : passe au jeu suivant et note l'erreur.
 - **5xx et erreurs réseau** : réessaie 2 fois, avec 2 puis 5 secondes d'attente.
 
@@ -267,7 +313,9 @@ Pour le client :
 ## 5. Algorithme recommandé pour le .nro
 
 ```
-1. Lire la config (url, api_key, slot). Initialiser le réseau (socketInitializeDefault) et libcurl.
+1. Lire la config (url, clé, slot). Initialiser le réseau (socketInitializeDefault) et libcurl.
+   Pas de clé → appairage (§1) : POST /pair, afficher code et URL, GET /pair/<pairingId> toutes les
+   `interval` secondes, enregistrer la clé reçue.
 2. GET /api/pokemon-saves/games         → table titleId (majuscules) → id du jeu.
    401 → afficher « clé API invalide », quitter.
 3. GET /api/pokemon-saves/backups       → table (game, slot) → sha256.
@@ -299,6 +347,13 @@ Notes d'implémentation :
 ```bash
 BASE=https://atools.akinaru.fr/api/pokemon-saves
 KEY=xxxxxxxx
+
+# Appairage : demande d'un code (sans clé)
+curl -X POST -H "Content-Type: application/json" -d '{"device":"Switch"}' $BASE/pair
+# → 201 {"pairingId":"…","code":"K7M2QX","expiresAt":"…","interval":5}
+# Saisir le code sur https://atools.akinaru.fr/apps/pokemon-saves/pair, puis :
+curl $BASE/pair/<pairingId>
+# → {"status":"pending"} … puis une seule fois {"status":"approved","apiKey":"…"}
 
 # Catalogue
 curl -H "X-API-Key: $KEY" $BASE/games

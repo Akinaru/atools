@@ -3,11 +3,13 @@ import type { App } from "../types";
 import { api } from "./api";
 import { GameView } from "./ui/GameView";
 import { HomeView } from "./ui/HomeView";
+import { PairView } from "./ui/PairView";
 import { SaveDetail } from "./ui/SaveDetail";
 
 function Page({ path }: { path: string[] }) {
   const [section, id] = path;
   if (!section) return <HomeView />;
+  if (section === "pair" && !id) return <PairView />;
   if (section === "game" && id) return <GameView gameId={id} />;
   if (section === "save" && id) return <SaveDetail id={id} />;
   notFound();

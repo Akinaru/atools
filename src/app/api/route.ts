@@ -3,8 +3,8 @@ import { isApiAuthorized } from "@/lib/auth";
 import { apiError, json } from "@/lib/api";
 
 /** GET /api: index of the general API, with each app's routes. */
-export function GET(request: Request) {
-  if (!isApiAuthorized(request)) return apiError(401, "Clé API manquante ou invalide.");
+export async function GET(request: Request) {
+  if (!(await isApiAuthorized(request))) return apiError(401, "Clé API manquante ou invalide.");
   return json({
     name: "atools",
     apps: apps
