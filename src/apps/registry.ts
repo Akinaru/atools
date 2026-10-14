@@ -1,9 +1,11 @@
 import type { App } from "./types";
+import aarchive from "./aarchive";
 import pokemonSaves from "./pokemon-saves";
 // new-app:import
 
 export const apps: App[] = [
   pokemonSaves,
+  aarchive,
   // new-app:entry
 ];
 

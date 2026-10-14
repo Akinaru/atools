@@ -43,7 +43,7 @@ export async function SaveDetail({ id }: { id: string }) {
         <DeleteButton id={save.id} />
       </header>
       {notices.map((notice) => (
-        <p key={notice} className="mb-4 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">⚠ {notice}</p>
+        <p key={notice} className="mb-4 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-extrabold text-amber-800">⚠ {notice}</p>
       ))}
       <ConsoleTabs tabs={tabs} />
     </main>

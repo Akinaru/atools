@@ -43,6 +43,7 @@ L'app apparaît sur l'accueil, avec son UI sur `/apps/mon-app` et son API sur `/
 | --- | --- |
 | `slug`, `name`, `description`, `icon`, `accent`, `cover` | Tuile d'accueil et URLs |
 | `Page({ path })` | Composant serveur. `/apps/mon-app/a/b` donne `path = ["a", "b"]` |
+| `url` | App externe, sans `Page` : la tuile ouvre cette URL dans un nouvel onglet (ex. `src/apps/aarchive`) |
 | `api` | Liste de routes `{ method, path: "items/:id", description, handler }` |
 
 - Fichiers : `appDataDir(slug, ...)` de `src/lib/storage.ts`.
@@ -65,7 +66,7 @@ Toutes les routes, sauf `/api/health`, demandent la clé `ATOOLS_API_KEY`. Elle 
 - `Authorization: Bearer <clé>` ;
 - `X-API-Key: <clé>`.
 
-Le navigateur connecté avec le mot de passe de l'interface y a aussi accès.
+Le navigateur connecté à l'interface y a aussi accès, grâce à son cookie de session.
 
 Un appareil peut aussi obtenir sa propre clé par **appairage** : il affiche un code, saisi ensuite sur `/apps/pokemon-saves/pair`. Les clés d'appareil sont stockées hachées dans `data/atools/devices.json`, et cette page permet de les révoquer.
 
@@ -119,7 +120,7 @@ Le `Dockerfile` produit une image autonome (Next `output: "standalone"`).
 
 1. Coolify → *New Resource* → ton dépôt Git → build pack **Dockerfile**, port **3000**.
 2. Variables d'environnement (voir `.env.example`) :
-   - `ATOOLS_PASSWORD` : mot de passe de l'interface. Le nom d'utilisateur est libre.
+   - `ATOOLS_PASSWORD` : mot de passe de l'interface, saisi sur la page `/login`. La session dure 30 jours. Changer le mot de passe déconnecte tous les navigateurs.
    - `ATOOLS_API_KEY` : clé de l'API. Génère-la par exemple avec `openssl rand -hex 32`.
 3. *Storages* : ajoute un volume persistant monté sur **`/app/data`**. C'est là que sont stockées les saves.
 4. Healthcheck : `GET /api/health`. Il est déjà déclaré dans l'image.

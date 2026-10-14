@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { BackButton } from "./BackButton";
 import { Controls } from "./Controls";
+import { LogoutButton } from "./LogoutButton";
 import { Battery, Clock } from "./StatusBar";
 
 /** Switch-like frame around every page: status bar on top, controls help at the bottom. */
@@ -23,7 +24,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             <BackButton />
           </Suspense>
         </div>
-        <Battery />
+        <div className="flex items-center gap-3">
+          {/* Reads the URL, so it renders at request time. */}
+          <Suspense fallback={null}>
+            <LogoutButton />
+          </Suspense>
+          <Battery />
+        </div>
       </header>
       <div className="flex flex-1 flex-col pb-10">{children}</div>
       <Controls />

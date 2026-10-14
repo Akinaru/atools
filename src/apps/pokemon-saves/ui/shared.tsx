@@ -115,7 +115,7 @@ export function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{label}</dt>
-      <dd className="truncate text-base font-semibold">{value}</dd>
+      <dd className="truncate text-base font-extrabold">{value}</dd>
     </div>
   );
 }

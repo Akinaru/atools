@@ -25,7 +25,7 @@ export function Controls() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (isTyping(event) || window.location.pathname === "/") return;
+      if (isTyping(event) || window.location.pathname === "/" || window.location.pathname === "/login") return;
       if (event.key === "Escape" || event.key === "Backspace") {
         event.preventDefault();
         playSound("back");

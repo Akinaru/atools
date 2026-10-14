@@ -40,7 +40,7 @@ export function BoxViewer({ boxes, gen, accent, accentDark }: { boxes: Box[]; ge
           <button onClick={() => switchBox(-1)} className="h-9 w-9 rounded-full text-lg font-black text-zinc-500 hover:bg-zinc-100">◀</button>
           <span className="flex items-center gap-2 font-black">
             <ItemIcon name="poke-ball" size={22} />
-            {box.name} <span className="text-sm font-semibold text-zinc-400">({box.mons.length}/{SLOTS})</span>
+            {box.name} <span className="text-sm font-extrabold text-zinc-400">({box.mons.length}/{SLOTS})</span>
           </span>
           <button onClick={() => switchBox(1)} className="h-9 w-9 rounded-full text-lg font-black text-zinc-500 hover:bg-zinc-100">▶</button>
         </div>
@@ -66,7 +66,7 @@ export function BoxViewer({ boxes, gen, accent, accentDark }: { boxes: Box[]; ge
             };
           })}
         />
-        <p className="mt-4 text-center text-xs font-semibold text-white drop-shadow">
+        <p className="mt-4 text-center text-xs font-extrabold text-white drop-shadow">
           Boîte {boxIndex + 1} / {boxes.length} · sors de la grille à gauche / droite pour changer de boîte
         </p>
       </div>

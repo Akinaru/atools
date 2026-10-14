@@ -40,7 +40,7 @@ export function Battery() {
       <span className="relative h-4 w-9 rounded-[4px] border-2 border-zinc-400 p-[2px] after:absolute after:-right-[5px] after:top-1 after:h-1.5 after:w-[3px] after:rounded-r after:bg-zinc-400">
         <span className={`block h-full rounded-[2px] ${percent > 20 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${percent}%` }} />
       </span>
-      <span className="mt-1 text-[11px] font-semibold text-zinc-600">
+      <span className="mt-1 text-[11px] font-extrabold text-zinc-600">
         {battery.charging ? "⚡ " : ""}
         {percent}%
       </span>

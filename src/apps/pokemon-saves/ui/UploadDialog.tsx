@@ -63,7 +63,7 @@ export function UploadDialog({ defaultGameId }: { defaultGameId?: string }) {
             <input name="label" placeholder="Ma partie principale" className={field} />
           </label>
           <input type="hidden" name="fileDate" value={fileDate} />
-          {state.error && <p className="text-sm font-semibold text-red-500">{state.error}</p>}
+          {state.error && <p className="text-sm font-extrabold text-red-500">{state.error}</p>}
           <div className="mt-2 flex justify-end gap-3">
             <button type="button" onClick={() => dialog.current?.close()} className="rounded-full px-5 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-100">
               Annuler

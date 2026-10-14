@@ -9,6 +9,8 @@ export type NavItem = {
   label: string;
   sublabel?: string;
   href?: string;
+  /** Opens `href` in a new tab. */
+  external?: boolean;
   /** Square tile content (image, sprite…). */
   tile: ReactNode;
 };
@@ -95,7 +97,8 @@ export function NavGrid({
           if ((event.target as HTMLElement)?.closest?.("a, button")) return;
           if (current?.href) {
             playSound("select");
-            router.push(current.href);
+            if (current.external) window.open(current.href, "_blank", "noopener");
+            else router.push(current.href);
           }
           break;
         default:
@@ -124,10 +127,12 @@ export function NavGrid({
               key={item.key}
               ref={(el) => { refs.current[i] = el; }}
               href={item.href}
+              {...(item.external && { target: "_blank", rel: "noopener noreferrer" })}
               onMouseEnter={() => select(i, false)}
               onClick={(event) => {
-                event.preventDefault();
                 playSound("select");
+                if (item.external) return; // The browser opens the new tab.
+                event.preventDefault();
                 router.push(item.href!);
               }}
               aria-label={item.label}

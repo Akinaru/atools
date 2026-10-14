@@ -4,10 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { KeyCap } from "./KeyCap";
 import { playSound } from "./sound";
 
-/** Back button of the status bar (same as B / Échap). Hidden on the home screen. */
+/** Back button of the status bar (same as B / Échap). Hidden on the home and login screens. */
 export function BackButton() {
   const router = useRouter();
-  if (usePathname() === "/") return null;
+  const pathname = usePathname();
+  if (pathname === "/" || pathname === "/login") return null;
   return (
     <button
       onClick={() => {

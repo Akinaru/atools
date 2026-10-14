@@ -4,7 +4,8 @@ import { refresh } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revokeDevice } from "@/lib/devices";
-import { approvePairing, clientIp, PairingError } from "@/lib/pairing";
+import { approvePairing, PairingError } from "@/lib/pairing";
+import { clientIp } from "@/lib/rate-limit";
 import { createSave, deleteSave, findGame, getSaveMeta, replaceSaveFile, SaveImportError, updateSave, type ManualInfo, type SaveFile } from "./store";
 
 export type UploadState = { error?: string; message?: string };

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getApp } from "@/apps/registry";
 
@@ -14,5 +14,6 @@ async function AppRenderer({ params }: Pick<PageProps<"/apps/[slug]/[[...path]]"
   const { slug, path = [] } = await params;
   const app = getApp(slug);
   if (!app) notFound();
+  if (!app.Page) return app.url ? redirect(app.url) : notFound();
   return <app.Page path={path.map(decodeURIComponent)} />;
 }

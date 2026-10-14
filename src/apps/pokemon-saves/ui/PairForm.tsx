@@ -22,8 +22,8 @@ export function PairForm() {
       <button disabled={pending} className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-bold text-white shadow hover:brightness-105 disabled:opacity-50">
         {pending ? "Validation…" : "Valider"}
       </button>
-      {state.error && <p className="w-full text-sm font-semibold text-red-500">{state.error}</p>}
-      {state.message && <p className="w-full text-sm font-semibold text-emerald-600">{state.message}</p>}
+      {state.error && <p className="w-full text-sm font-extrabold text-red-500">{state.error}</p>}
+      {state.message && <p className="w-full text-sm font-extrabold text-emerald-600">{state.message}</p>}
     </form>
   );
 }

@@ -19,7 +19,9 @@ export type App = {
   /** Optional square image for the home screen tile (path in public/). */
   cover?: string;
   /** Server component rendering the app. Use `path` for sub-pages. */
-  Page: (props: AppPageProps) => ReactNode | Promise<ReactNode>;
+  Page?: (props: AppPageProps) => ReactNode | Promise<ReactNode>;
+  /** External app: the home tile opens this URL in a new tab instead of a page. */
+  url?: string;
   /** Optional API routes, served at /api/<slug>/<route path> and protected by the API key. */
   api?: ApiRoute[];
 };

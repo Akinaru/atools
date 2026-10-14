@@ -1,5 +1,6 @@
 import { apiError, json, type ApiContext, type ApiRoute } from "@/lib/api";
-import { clientIp, PairingError, pollPairing, startPairing } from "@/lib/pairing";
+import { PairingError, pollPairing, startPairing } from "@/lib/pairing";
+import { clientIp } from "@/lib/rate-limit";
 import { GAMES, getGame } from "./games";
 import type { Mon } from "./parsers";
 import {

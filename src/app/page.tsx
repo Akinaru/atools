@@ -14,12 +14,13 @@ export default function Home() {
         placeholders={placeholders}
         items={apps.map((app) => ({
           key: app.slug,
-          href: `/apps/${app.slug}`,
+          href: app.url ?? `/apps/${app.slug}`,
+          external: !!app.url,
           label: app.name,
           sublabel: app.description,
           tile: app.cover ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={app.cover} alt="" className="h-full w-full object-cover" />
+            <img src={app.cover} alt="" className="h-full w-full object-cover" style={{ background: app.accent }} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-6xl" style={{ background: app.accent }}>
               {app.icon}
