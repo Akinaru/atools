@@ -71,6 +71,8 @@ Le navigateur connecté avec le mot de passe de l'interface y a aussi accès.
 
 ### Saves Pokémon (`/api/pokemon-saves`)
 
+Doc complète pour un client (homebrew Switch) : [`docs/pokemon-saves-api.md`](docs/pokemon-saves-api.md).
+
 | Méthode | Route | Rôle |
 | --- | --- | --- |
 | GET | `/games` | Catalogue des jeux, avec les title IDs Switch |
