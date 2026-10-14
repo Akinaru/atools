@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { KeyCap } from "@/components/console/KeyCap";
 import { isTyping, playSound } from "@/components/console/sound";
 import { uploadSave } from "../server/actions";
 import { GAMES } from "../games";
@@ -30,7 +29,7 @@ export function UploadDialog({ defaultGameId }: { defaultGameId?: string }) {
   return (
     <>
       <button onClick={open} className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold shadow-sm transition hover:scale-105 hover:shadow-md">
-        <KeyCap>X</KeyCap> Ajouter une save
+        + Ajouter une save
       </button>
       <dialog ref={dialog} className="pop-in m-auto w-[min(32rem,92vw)] rounded-3xl bg-white p-0 shadow-2xl backdrop:bg-black/30 backdrop:backdrop-blur-sm">
         <form action={action} className="grid gap-4 p-7">

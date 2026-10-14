@@ -51,7 +51,7 @@ L'app apparaît sur l'accueil, avec son UI sur `/apps/mon-app` et son API sur `/
 - Kit console (`src/components/console/`) :
   - `NavGrid` : tuiles avec curseur.
   - `ConsoleTabs` : onglets L/R.
-  - `KeyCap` et `playSound`.
+  - `playSound` : sons de navigation.
 
 | Action | Clavier | Manette |
 | --- | --- | --- |

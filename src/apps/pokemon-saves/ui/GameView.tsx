@@ -52,7 +52,7 @@ export async function GameView({ gameId }: { gameId: string }) {
             }))}
           />
         ) : (
-          <p className="rounded-3xl bg-white/60 py-16 text-center text-zinc-400">Aucune save pour ce jeu. Appuie sur X pour en ajouter une.</p>
+          <p className="rounded-3xl bg-white/60 py-16 text-center text-zinc-400">Aucune save pour ce jeu. Clique sur « Ajouter une save » pour en ajouter une.</p>
         )}
       </section>
     </main>

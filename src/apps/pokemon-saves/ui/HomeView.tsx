@@ -46,7 +46,7 @@ export async function HomeView() {
       content: owned.length ? (
         <NavGrid columnsClassName={GRID} items={owned.map(gameItem)} />
       ) : (
-        <p className="py-16 text-center text-zinc-400">Aucune save pour l&apos;instant. Appuie sur X pour en ajouter une.</p>
+        <p className="py-16 text-center text-zinc-400">Aucune save pour l&apos;instant. Clique sur « Ajouter une save » pour en ajouter une.</p>
       ),
     },
     ...[...new Set(GAMES.map((g) => g.gen))].map((gen) => ({

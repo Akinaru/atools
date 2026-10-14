@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyCap } from "./KeyCap";
 import { isTyping, playSound } from "./sound";
 
 /** Tabs switched with L / R (Q / E on keyboard, shoulder buttons on a gamepad). */
@@ -27,8 +26,8 @@ export function ConsoleTabs({ tabs, initial = 0 }: { tabs: { label: string; cont
   return (
     <div>
       <nav className="mb-8 flex items-center justify-center gap-3">
-        <button onClick={() => go(active - 1)} className="opacity-70 hover:opacity-100" aria-label="Onglet précédent">
-          <KeyCap>L</KeyCap>
+        <button onClick={() => go(active - 1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/70 text-lg font-black text-zinc-500 shadow-sm hover:text-zinc-800" aria-label="Onglet précédent">
+          ‹
         </button>
         <div className="flex gap-1 rounded-full bg-white/70 p-1 shadow-sm backdrop-blur">
           {tabs.map((tab, i) => (
@@ -41,8 +40,8 @@ export function ConsoleTabs({ tabs, initial = 0 }: { tabs: { label: string; cont
             </button>
           ))}
         </div>
-        <button onClick={() => go(active + 1)} className="opacity-70 hover:opacity-100" aria-label="Onglet suivant">
-          <KeyCap>R</KeyCap>
+        <button onClick={() => go(active + 1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/70 text-lg font-black text-zinc-500 shadow-sm hover:text-zinc-800" aria-label="Onglet suivant">
+          ›
         </button>
       </nav>
       {/* Only the active tab is mounted, so only its grid listens to the keyboard. */}

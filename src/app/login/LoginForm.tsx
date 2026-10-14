@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
-import { KeyCap } from "@/components/console/KeyCap";
 import { login, type LoginState } from "./actions";
 
 export function LoginForm() {
@@ -24,9 +23,9 @@ export function LoginForm() {
       {state.error && <p className="text-sm font-black text-red-500">{state.error}</p>}
       <button
         disabled={pending}
-        className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-6 py-3 text-lg font-black text-white shadow-[0_4px_0_#0089b6] transition hover:brightness-105 active:translate-y-[2px] active:shadow-[0_2px_0_#0089b6] disabled:opacity-50"
+        className="rounded-full bg-[var(--accent)] px-6 py-3 text-lg font-black text-white shadow-[0_4px_0_#0089b6] transition hover:brightness-105 active:translate-y-[2px] active:shadow-[0_2px_0_#0089b6] disabled:opacity-50"
       >
-        <KeyCap>A</KeyCap> {pending ? "Connexion…" : "Se connecter"}
+        {pending ? "Connexion…" : "Se connecter"}
       </button>
     </form>
   );
