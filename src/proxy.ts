@@ -12,5 +12,5 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Everything except the API, Next internals and public assets.
-  matcher: ["/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|assets/).*)"],
+  matcher: ["/((?!api(?:/|$)|_next/|favicon.ico|assets/).*)"],
 };

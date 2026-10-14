@@ -95,6 +95,11 @@ export function getGameBySwitchTitleId(titleId: string): Game | undefined {
   return GAMES.find((game) => game.switchTitleId?.toLowerCase() === titleId.trim().toLowerCase());
 }
 
+/** A game from its id ("shield") or its Switch title ID ("01008DB008C2C000"). */
+export function resolveGame(ref: string): Game | undefined {
+  return getGame(ref) ?? getGameBySwitchTitleId(ref);
+}
+
 export function gradient(game: Game): string {
   return `linear-gradient(135deg, ${game.colors[0]}, ${game.colors[1]})`;
 }

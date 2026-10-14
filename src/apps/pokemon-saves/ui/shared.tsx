@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { boxart, getGame, gradient, type Game } from "../games";
+import { badgeImages, boxart, getGame, gradient, type Game } from "../games";
 import type { SaveView } from "../server/store";
 import { Sprite } from "./sprites";
 
@@ -43,23 +43,66 @@ export function GameTileArt({ game, count }: { game: Game; count: number }) {
   );
 }
 
-/** Square tile for a save: cover background, trainer name and team. */
-export function SaveTileArt({ save }: { save: SaveView }) {
+/** "il y a 3 heures" style date. Reads the current time: callers must `await io()` first (Cache Components). */
+export function formatRelative(iso: string): string {
+  const seconds = (new Date(iso).getTime() - Date.now()) / 1000;
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]];
+  const format = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
+  for (const [unit, size] of units) if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
+  return "à l'instant";
+}
+
+/** Card of a save: trainer header in the game's colors, team slots, key stats. */
+export function SaveCardArt({ save }: { save: SaveView }) {
   const game = getGame(save.gameId)!;
   const team = save.info.party.slice(0, 6);
+  const badgeCount = badgeImages(game).length;
   return (
-    <div className="flex h-full w-full flex-col" style={{ background: gradient(game) }}>
-      <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/10 to-black/55" />
-      <div className="relative flex flex-1 flex-wrap content-center items-center justify-center gap-0.5 p-2">
-        {team.map((mon, i) => (
-          <Sprite key={i} mon={mon} gen={game.gen} size={team.length > 3 ? 44 : 60} />
-        ))}
-        {!team.length && <Cover game={game} className="h-24 rounded-lg shadow-lg" />}
+    <div className="flex h-full w-full flex-col bg-white">
+      <div className="relative flex items-center gap-3 overflow-hidden px-4 py-3 text-white" style={{ background: gradient(game) }}>
+        <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full border-[14px] border-white/15" />
+        <Cover game={game} className="h-12 w-12 shrink-0 rounded-xl shadow-md ring-2 ring-white/70" />
+        <div className="relative min-w-0 flex-1">
+          <p className="truncate text-[11px] font-bold uppercase tracking-wider opacity-85">{save.label}</p>
+          <p className="truncate text-xl font-black leading-tight drop-shadow">{save.info.trainer ?? "Dresseur inconnu"}</p>
+        </div>
+        {save.slot && (
+          <span className="relative shrink-0 rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide" title="Mise à jour automatique par la backup">
+            ⟳ {save.slot}
+          </span>
+        )}
       </div>
-      <div className="relative px-3 pb-2.5 text-white">
-        <p className="truncate text-sm font-black drop-shadow">{save.info.trainer ?? save.label}</p>
-        <p className="truncate text-[11px] opacity-85">Pokémon {game.name}</p>
+
+      <div className="flex flex-1 items-center justify-center gap-1 px-3" style={{ background: `radial-gradient(ellipse at center, ${game.colors[0]}1f, transparent 70%)` }}>
+        {Array.from({ length: 6 }, (_, i) =>
+          team[i] ? (
+            <span key={i} className={`flex h-12 w-12 items-center justify-center rounded-full ${team[i].shiny ? "bg-yellow-100" : ""}`}>
+              <Sprite mon={team[i]} gen={game.gen} size={46} />
+            </span>
+          ) : (
+            <span key={i} className="h-9 w-9 rounded-full border-2 border-dashed border-zinc-200" />
+          ),
+        )}
       </div>
+
+      <div className="grid grid-cols-3 gap-1.5 px-3 pb-2 text-center">
+        <CardStat label="Temps" value={formatPlayTime(save.info.hours, save.info.minutes)} />
+        <CardStat label="Argent" value={save.info.money === undefined ? "—" : `${save.info.money.toLocaleString("fr-FR")} ₽`} />
+        <CardStat label="Badges" value={save.parsed?.badges !== undefined && badgeCount ? `${save.parsed.badges}/${badgeCount}` : "—"} />
+      </div>
+      <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
+        <span>Sauvegardée {formatRelative(save.fileDate)}</span>
+        {save.parseError ? <span className="font-bold text-amber-500">⚠ illisible</span> : save.versions.length > 0 && <span>{save.versions.length} version{save.versions.length > 1 ? "s" : ""}</span>}
+      </div>
+    </div>
+  );
+}
+
+function CardStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-zinc-50 px-1 py-1.5">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">{label}</p>
+      <p className="truncate text-xs font-black">{value}</p>
     </div>
   );
 }

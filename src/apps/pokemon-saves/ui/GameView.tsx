@@ -1,13 +1,16 @@
+import { io } from "next/cache";
 import { notFound } from "next/navigation";
 import { NavGrid } from "@/components/console/NavGrid";
 import { getGame, gradient } from "../games";
 import { getSaveView, listSaves } from "../server/store";
-import { BASE, Cover, formatDate, formatPlayTime, SaveTileArt } from "./shared";
+import { BASE, Cover, formatDate, SaveCardArt } from "./shared";
 import { UploadDialog } from "./UploadDialog";
 
 export async function GameView({ gameId }: { gameId: string }) {
   const game = getGame(gameId);
   if (!game) notFound();
+  // The save cards show relative dates ("il y a 2 h"), which read the current time.
+  await io();
   const saves = await Promise.all((await listSaves()).filter((s) => s.gameId === game.id).map(getSaveView));
 
   return (
@@ -38,13 +41,14 @@ export async function GameView({ gameId }: { gameId: string }) {
         </div>
         {saves.length ? (
           <NavGrid
-            columnsClassName="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+            columnsClassName="grid-cols-1 sm:grid-cols-2"
+            aspectClassName="aspect-[16/11]"
             items={saves.map((save) => ({
               key: save.id,
               href: `${BASE}/save/${save.id}`,
               label: save.label,
-              sublabel: `${save.info.trainer ?? "?"} · ${formatPlayTime(save.info.hours, save.info.minutes)} · ${formatDate(save.fileDate)}`,
-              tile: <SaveTileArt save={save} />,
+              sublabel: `${save.slot ? `Backup « ${save.slot} » · ` : ""}Sauvegardée le ${formatDate(save.fileDate)}${save.versions.length ? ` · ${save.versions.length} version(s) précédente(s)` : ""}`,
+              tile: <SaveCardArt save={save} />,
             }))}
           />
         ) : (

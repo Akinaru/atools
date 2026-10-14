@@ -29,6 +29,8 @@ type Props = {
   onEdge?: (direction: "left" | "right") => void;
   /** "tile": white console tile; "slot": translucent slot letting the background show (PC box). */
   variant?: "tile" | "slot";
+  /** Tile shape, e.g. "aspect-[4/3]" for cards. */
+  aspectClassName?: string;
 };
 
 const VARIANTS = {
@@ -47,6 +49,7 @@ export function NavGrid({
   onSelect,
   onEdge,
   variant = "tile",
+  aspectClassName = "aspect-square",
 }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(Math.min(initialIndex, Math.max(items.length - 1, 0)));
@@ -114,7 +117,7 @@ export function NavGrid({
       )}
       <div className={`grid w-full gap-4 sm:gap-5 ${columnsClassName}`}>
         {items.map((item, i) => {
-          const className = `tile group block aspect-square cursor-pointer transition duration-150 ${VARIANTS[variant].outer} ${i === selected ? "tile-selected scale-[1.04]" : "hover:scale-[1.02]"}`;
+          const className = `tile group block ${aspectClassName} cursor-pointer transition duration-150 ${VARIANTS[variant].outer} ${i === selected ? "tile-selected scale-[1.04]" : "hover:scale-[1.02]"}`;
           const inner = <div className={`relative h-full w-full overflow-hidden ${VARIANTS[variant].inner}`}>{item.tile}</div>;
           return item.href ? (
             <a
@@ -139,7 +142,7 @@ export function NavGrid({
           );
         })}
         {Array.from({ length: placeholders }, (_, i) => (
-          <div key={`placeholder-${i}`} className="aspect-square rounded-[22px] bg-white/45 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]" />
+          <div key={`placeholder-${i}`} className={`${aspectClassName} rounded-[22px] bg-white/45 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]`} />
         ))}
       </div>
     </div>

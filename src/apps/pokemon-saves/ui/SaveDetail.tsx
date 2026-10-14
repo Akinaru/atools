@@ -8,6 +8,7 @@ import type { Mon } from "../parsers";
 import { getSaveMeta, getSaveView, type SaveView } from "../server/store";
 import { BoxViewer } from "./BoxViewer";
 import { DeleteButton } from "./DeleteButton";
+import { ReplaceForm } from "./ReplaceForm";
 import { Cover, formatDate, formatMoney, formatPlayTime, Panel, Stat } from "./shared";
 import { ItemIcon, monText, Sprite } from "./sprites";
 
@@ -155,8 +156,31 @@ function Infos({ save, game }: { save: SaveView; game: Game }) {
           <Stat label="Date de la save" value={formatDate(save.fileDate)} />
           <Stat label="Ajoutée le" value={formatDate(save.uploadedAt)} />
           <Stat label="Lecture" value={game.format ? (save.parseError ? "Erreur" : "Automatique") : "Manuelle"} />
+          <Stat label="Mise à jour" value={`${formatDate(save.updatedAt)} (${save.source === "api" ? "API" : "web"})`} />
+          <Stat label="Slot de backup" value={save.slot ?? "—"} />
+          <Stat label="SHA-256" value={<span className="font-mono text-xs" title={save.sha256}>{save.sha256.slice(0, 16)}…</span>} />
         </dl>
         {save.notes && <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-600">{save.notes}</p>}
+      </Panel>
+      <Panel>
+        <h3 className="mb-1 text-lg font-black">Fichier & versions</h3>
+        <p className="mb-4 text-sm text-zinc-500">Remplacer le fichier garde l&apos;ancien dans les versions (les 10 dernières).</p>
+        <ReplaceForm id={save.id} />
+        {save.versions.length > 0 && (
+          <ul className="mt-5 divide-y divide-zinc-100 rounded-2xl bg-zinc-50">
+            {save.versions.map((version) => (
+              <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                <span>
+                  <span className="font-bold">Remplacée le {formatDate(version.replacedAt)}</span>
+                  <span className="text-zinc-400"> · {version.fileName} · {Math.round(version.size / 1024)} Ko</span>
+                </span>
+                <a href={`/api/pokemon-saves/saves/${save.id}/versions/${version.id}/file`} className="rounded-full bg-white px-3 py-1 text-xs font-bold shadow-sm hover:scale-105">
+                  ⬇ Télécharger
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
       <Panel>
         <h3 className="mb-4 text-lg font-black">Modifier / compléter</h3>

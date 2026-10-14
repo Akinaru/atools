@@ -1,7 +1,9 @@
 import path from "node:path";
 
 // Mount this folder as a persistent volume in production (see Dockerfile).
-const DATA_ROOT = path.resolve(process.env.ATOOLS_DATA_DIR ?? path.join(process.cwd(), "data"));
+// Relative to the working directory, without process.cwd(): Turbopack would otherwise trace the
+// whole project as a dependency and rebuild (reload the page) on every file write, logs included.
+const DATA_ROOT = path.resolve(/* turbopackIgnore: true */ process.env.ATOOLS_DATA_DIR ?? "data");
 
 /** Private on-disk folder of an app: <data>/<slug>/<...segments>. */
 export function appDataDir(slug: string, ...segments: string[]): string {

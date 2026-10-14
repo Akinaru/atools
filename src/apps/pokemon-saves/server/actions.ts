@@ -2,9 +2,9 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { deleteSave, getSaveMeta, importSave, SaveImportError, updateSave, type ManualInfo } from "./store";
+import { createSave, deleteSave, findGame, getSaveMeta, replaceSaveFile, SaveImportError, updateSave, type ManualInfo, type SaveFile } from "./store";
 
-export type UploadState = { error?: string };
+export type UploadState = { error?: string; message?: string };
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "").trim();
 const optionalNumber = (formData: FormData, key: string) => {
@@ -12,23 +12,41 @@ const optionalNumber = (formData: FormData, key: string) => {
   return value === "" || Number.isNaN(Number(value)) ? undefined : Number(value);
 };
 
-export async function uploadSave(_prev: UploadState, formData: FormData): Promise<UploadState> {
+async function fileFromForm(formData: FormData): Promise<SaveFile | null> {
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return { error: "Choisis un fichier de save." };
+  if (!(file instanceof File) || file.size === 0) return null;
+  return {
+    fileName: file.name,
+    bytes: new Uint8Array(await file.arrayBuffer()),
+    fileDate: new Date(Number(text(formData, "fileDate")) || Date.now()),
+  };
+}
+
+export async function uploadSave(_prev: UploadState, formData: FormData): Promise<UploadState> {
+  const file = await fileFromForm(formData);
+  if (!file) return { error: "Choisis un fichier de save." };
   let id: string;
   try {
-    ({ id } = await importSave({
-      gameId: text(formData, "gameId") || undefined,
-      fileName: file.name,
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      label: text(formData, "label"),
-      fileDate: new Date(Number(text(formData, "fileDate")) || Date.now()),
-    }));
+    ({ id } = await createSave(findGame(text(formData, "gameId") || undefined), file, { label: text(formData, "label"), source: "web" }));
   } catch (error) {
     if (error instanceof SaveImportError) return { error: error.message };
     throw error;
   }
   redirect(`/apps/pokemon-saves/save/${id}`);
+}
+
+/** Replaces the file of a save from the web UI; the previous file is kept as a version. */
+export async function replaceSave(id: string, _prev: UploadState, formData: FormData): Promise<UploadState> {
+  const file = await fileFromForm(formData);
+  if (!file) return { error: "Choisis un fichier de save." };
+  try {
+    const { status } = await replaceSaveFile(id, file, "web");
+    refresh();
+    return { message: status === "unchanged" ? "Fichier identique à la version actuelle : rien à changer." : "Save remplacée." };
+  } catch (error) {
+    if (error instanceof SaveImportError) return { error: error.message };
+    throw error;
+  }
 }
 
 export async function editSave(id: string, formData: FormData) {

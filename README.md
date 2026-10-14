@@ -74,31 +74,38 @@ Le navigateur connecté avec le mot de passe de l'interface y a aussi accès.
 | Méthode | Route | Rôle |
 | --- | --- | --- |
 | GET | `/games` | Catalogue des jeux, avec les title IDs Switch |
-| GET | `/saves` (`?game=black`) | Saves avec leur résumé |
-| POST | `/saves` | Envoi d'une save |
-| GET | `/saves/:id` | Détail : équipe, boîtes, badges, Pokédex |
-| GET | `/saves/:id/file` | Fichier original |
+| GET | `/backups` | Saves de backup : `game`, `slot`, `sha256`, `updatedAt` |
+| PUT | `/backups/:game/:slot` | **Ajoute ou met à jour** la save d'un slot |
+| GET | `/saves` (`?game=`, `?slot=`) | Saves avec leur résumé |
+| POST | `/saves` | Ajoute une nouvelle save |
+| GET | `/saves/:id` | Détail : équipe, boîtes, badges, Pokédex, versions |
+| PUT | `/saves/:id` | **Écrase** le fichier d'une save |
+| GET | `/saves/:id/file` | Fichier actuel |
+| GET | `/saves/:id/versions/:version/file` | Une version précédente |
 | DELETE | `/saves/:id` | Suppression |
 
-Il y a deux façons d'envoyer une save. La plus simple pour un homebrew Switch est le corps binaire brut, avec le jeu donné par son title ID :
+**Envoi d'un fichier.** Toutes les routes d'envoi acceptent deux formats :
+- un corps binaire brut, avec en paramètres d'URL `filename`, `modified` (millisecondes ou date ISO) et `label` ;
+- du `multipart/form-data`, avec les champs `file`, `label` et `fileDate`.
+
+Une save Switch est un dossier : envoie-le en **`.zip`**. L'app y lit `main` (Épée/Bouclier, Arceus) ou `savedata.bin` (Let's Go).
+
+**Écrasement sans perte.** Chaque écrasement garde l'ancien fichier en version (les 10 dernières). Renvoyer un fichier identique ne change rien, et la réponse est `status: "unchanged"`.
+
+**Backup depuis la Switch.** Chaque jeu a un slot fixe, par exemple `switch` :
+- `:game` est l'id du catalogue (`shield`) ou le title ID Switch (`01008DB008C2C000`) ;
+- `:slot` est un nom libre : lettres, chiffres, `.`, `_` et `-`, 64 caractères maximum.
+
+1. `GET /api/pokemon-saves/backups` : récupère les `sha256` connus.
+2. Pour chaque jeu dont le SHA-256 local diffère, envoie la save :
 
 ```bash
-curl -X POST "https://atools.example.com/api/pokemon-saves/saves?titleId=01008DB008C2C000&filename=main&label=Bouclier" \
-  -H "X-API-Key: $ATOOLS_API_KEY" --data-binary @main
+curl -X PUT "https://atools.akinaru.fr/api/pokemon-saves/backups/01008DB008C2C000/switch?filename=Bouclier.zip&modified=1760400000000" \
+  -H "X-API-Key: $ATOOLS_API_KEY" --data-binary @Bouclier.zip
+# → 201 {"status":"created", "save":{…}}   puis   200 {"status":"updated" | "unchanged", …}
 ```
 
-L'autre est le multipart, avec les champs `file`, `game` ou `titleId`, `label` et `fileDate` :
-
-```bash
-curl -X POST https://atools.example.com/api/pokemon-saves/saves \
-  -H "Authorization: Bearer $ATOOLS_API_KEY" -F file=@Pokemon_Noir.sav -F game=black
-```
-
-Les jeux se désignent de deux façons :
-- `game` : l'id du catalogue (`black`, `y`, `shield`…) ;
-- `titleId` : le title ID Switch (Let's Go, Épée/Bouclier, DÉ/PS, Arceus, Écarlate/Violet).
-
-`modified` / `fileDate` accepte des millisecondes ou une date ISO.
+Codes d'erreur : 400 (jeu, slot ou fichier invalide), 401 (clé API), 404 (save inconnue). Le corps est `{ "error": "…" }`.
 
 ## Déploiement (Coolify)
 
