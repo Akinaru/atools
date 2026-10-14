@@ -1,0 +1,25 @@
+import type { ReactNode } from "react";
+import type { ApiRoute } from "@/lib/api";
+
+export type AppPageProps = {
+  /** URL segments after /apps/<slug>, e.g. /apps/foo/a/b -> ["a", "b"]. */
+  path: string[];
+};
+
+/** An app of the dashboard: one folder in src/apps/<slug>/, registered in src/apps/registry.ts. */
+export type App = {
+  /** Id used everywhere: UI at /apps/<slug>, API at /api/<slug>/..., files in <data>/<slug>/. */
+  slug: string;
+  name: string;
+  description: string;
+  /** Emoji shown on the home tile when there is no cover. */
+  icon: string;
+  /** Any CSS color or gradient. */
+  accent: string;
+  /** Optional square image for the home screen tile (path in public/). */
+  cover?: string;
+  /** Server component rendering the app. Use `path` for sub-pages. */
+  Page: (props: AppPageProps) => ReactNode | Promise<ReactNode>;
+  /** Optional API routes, served at /api/<slug>/<route path> and protected by the API key. */
+  api?: ApiRoute[];
+};
