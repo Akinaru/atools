@@ -52,6 +52,7 @@ export function Picker({
   ariaLabel,
   className = "",
   size = "md",
+  up = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -62,6 +63,8 @@ export function Picker({
   ariaLabel: string;
   className?: string;
   size?: "sm" | "md";
+  /** Opens the list above the button (e.g. in a bar stuck to the bottom of the screen). */
+  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -156,7 +159,7 @@ export function Picker({
           tabIndex={-1}
           aria-label={ariaLabel}
           aria-activedescendant={`${id}-${active}`}
-          className="mn-drop absolute left-0 z-40 mt-2 max-h-72 min-w-full overflow-auto border-[3px] border-[var(--mn-ink)] bg-white py-1 text-[var(--mn-ink)] shadow-[5px_6px_0_var(--mn-ink)] outline-none"
+          className={`mn-drop absolute left-0 z-40 ${up ? "bottom-full mb-2" : "mt-2"} max-h-72 min-w-full overflow-auto border-[3px] border-[var(--mn-ink)] bg-white py-1 text-[var(--mn-ink)] shadow-[5px_6px_0_var(--mn-ink)] outline-none`}
           style={{ "--mn-tilt": "-0.6deg" } as React.CSSProperties}
         >
           {options.map((option, index) => [

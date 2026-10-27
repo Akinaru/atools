@@ -12,8 +12,8 @@ export const BASE = "/apps/monnaie";
 const NAV = [
   { key: "mois", label: "Ce mois", href: BASE },
   { key: "annee", label: "L'année", href: `${BASE}/annee` },
+  { key: "lignes", label: "Lignes", href: `${BASE}/lignes` },
   { key: "objectifs", label: "Objectifs", href: `${BASE}/objectifs` },
-  { key: "import", label: "Import", href: `${BASE}/import` },
   { key: "reglages", label: "Réglages", href: `${BASE}/reglages` },
 ] as const;
 

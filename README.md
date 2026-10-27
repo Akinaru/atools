@@ -184,9 +184,10 @@ Suivi de l'argent : ce que je gagne, mes charges (loyer, énergie, assurances…
 | `server/store.ts` | Stockage dans `data/monnaie/ledger.json`, validation des entrées |
 | `server/actions.ts` | Server Actions des formulaires |
 | `import/` | Lecture des exports bancaires et suggestions de catégorie |
-| `ui/` | Écrans : mois, année, objectifs, import, réglages ; DA dans `ui/monnaie.css` |
+| `ui/` | Écrans : mois, année, lignes, objectifs, réglages (import compris) ; DA dans `ui/monnaie.css` |
 
-- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/annee/AAAA`, `/objectifs`, `/import`, `/reglages`.
+- **Pages** : `/apps/monnaie` (le mois, ◀ ▶ sans changer l'URL), `/annee`, `/lignes`, `/objectifs`, `/reglages` avec ses onglets `/reglages/import`, `/categories`, `/recurrents`, `/pointages`, `/donnees`.
+- **Lignes** : toutes les lignes, filtrées (texte, catégorie, période), triées, en liste ou groupées par libellé. Sélection (clic, Maj+clic, ⌘A) puis actions groupées : renommer, reclasser, regret, supprimer. « Retenir pour l'import » met aussi à jour les règles d'import.
 - **Import bancaire** (`import/`) : `caisse-epargne.ts` lit l'export CSV, `suggest.ts` propose type et catégorie (règles apprises, puis catégories de la banque). Chaque opération a un `importId` stable : réimporter une période ne crée pas de doublon. Corriger une ligne à l'import crée une règle (gérées dans les Réglages).
 - **Épargne** : le livret, avec son solde de départ dans les Réglages. Revolut est traité comme une dépense ou un revenu (catégorie « Revolut »).
 - **Analyses** (`insights.ts`) : ce qui revient chaque mois (même libellé, 3 mois sur 6, montant stable), prévision du solde au 31, moyenne de chaque catégorie sur les 3 mois précédents.

@@ -151,7 +151,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             <div className="flex items-baseline justify-between gap-3">
               <Tag>Solde réel</Tag>
               {lastCheck && (
-                <Link href={`${BASE}/reglages#pointages`} className="text-sm font-semibold text-[var(--mn-muted)] hover:text-white">
+                <Link href={`${BASE}/reglages/pointages`} className="text-sm font-semibold text-[var(--mn-muted)] hover:text-white">
                   [pointé le {lastCheck.checkpoint.date.slice(8)}/{lastCheck.checkpoint.date.slice(5, 7)}{" "}
                   {lastCheck.gap === null || lastCheck.gap === 0 ? "✓" : <span className="text-[var(--mn-red)]">⚠ {formatSigned(lastCheck.gap)}</span>}]
                 </Link>
@@ -159,7 +159,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             </div>
             {balance === null ? (
               <p className="mt-3 text-lg">
-                <Link href={`${BASE}/reglages#pointages`} className="font-bold underline decoration-[var(--mn-accent)] decoration-4 underline-offset-4">
+                <Link href={`${BASE}/reglages/pointages`} className="font-bold underline decoration-[var(--mn-accent)] decoration-4 underline-offset-4">
                   Pointe ton solde
                 </Link>{" "}
                 pour suivre ton vrai compte et sa prévision au 31.

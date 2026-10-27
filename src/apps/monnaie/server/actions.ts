@@ -10,6 +10,9 @@ import { categoriesOf, MONTH_PATTERN, parseAmount, parseOptionalAmount, type Cat
 import {
   addEntry,
   addGoal,
+  bulkDeleteEntries,
+  bulkEditEntries,
+  type BulkPatch,
   addRecurring,
   applyRecurring,
   deleteEntry,
@@ -80,6 +83,24 @@ export async function saveEntry(_prev: FormState, formData: FormData): Promise<F
 export async function removeEntry(id: string) {
   await deleteEntry(id);
   refresh();
+}
+
+/** Bulk actions of the Lignes page; `learn` also updates the import rules (see bulkEditEntries). */
+export async function editLines(ids: string[], patch: BulkPatch, learn: boolean): Promise<{ error?: string; changed?: number }> {
+  try {
+    const changed = await bulkEditEntries(ids, patch, learn);
+    refresh();
+    return { changed };
+  } catch (error) {
+    if (error instanceof LedgerError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function deleteLines(ids: string[]): Promise<{ changed: number }> {
+  const changed = await bulkDeleteEntries(ids);
+  refresh();
+  return { changed };
 }
 
 export async function flipRegret(id: string) {

@@ -169,6 +169,72 @@ export function toggleRegret(id: string): Promise<void> {
   });
 }
 
+export type BulkPatch = { label?: unknown; kind?: unknown; category?: unknown; regret?: unknown };
+
+/**
+ * Changes the name, the type + category or the regret of several lines at once: all valid or nothing written.
+ * With `learn`, the next imports follow: a rule already naming the old label takes the new one, and each renamed
+ * or reclassified bank label gets an exact rule (when its lines agree on a type and a category).
+ */
+export function bulkEditEntries(ids: string[], patch: BulkPatch, learn = false): Promise<number> {
+  const wanted = new Set(ids);
+  return update((ledger) => {
+    const categories = categoriesOf(ledger);
+    const entries = ledger.entries.filter((e) => wanted.has(e.id));
+    if (!entries.length) throw new LedgerError("Aucune ligne sélectionnée.");
+    if ("kind" in patch && !(CUSTOMIZABLE_KINDS as readonly unknown[]).includes(patch.kind)) throw new LedgerError("Possible pour plaisir, charge ou revenu.");
+    const before = new Map(entries.map((e) => [e.id, e.label]));
+    const checked = entries.map((entry) => {
+      const input: EntryInput = { ...entry };
+      for (const key of ["label", "kind", "category", "regret"] as const) if (key in patch) input[key] = patch[key];
+      return [entry, checkEntry(input, categories)] as const;
+    });
+    let changed = 0;
+    for (const [entry, next] of checked) {
+      if (next.label !== entry.label || next.kind !== entry.kind || next.category !== entry.category || next.regret !== entry.regret) changed++;
+      Object.assign(entry, next);
+    }
+
+    if (learn && ("label" in patch || "kind" in patch)) {
+      const byOldLabel = new Map<string, Entry[]>();
+      for (const entry of entries) byOldLabel.set(before.get(entry.id)!, [...(byOldLabel.get(before.get(entry.id)!) ?? []), entry]);
+      for (const [old, list] of byOldLabel) {
+        const { kind, category, label } = list[0];
+        const agree = (CUSTOMIZABLE_KINDS as readonly Kind[]).includes(kind) && list.every((e) => e.kind === kind && e.category === category);
+        // A label given by a rule is not the bank's: those rules are the ones to update.
+        const named = ledger.rules.filter((r) => r.label === old);
+        if (named.length) {
+          for (const rule of named) {
+            if ("label" in patch) rule.label = label;
+            if ("kind" in patch && agree) Object.assign(rule, { kind, category });
+          }
+          continue;
+        }
+        if (!agree || !list.some((e) => e.importId)) continue;
+        const match = normalizeBankLabel(old);
+        const existing = ledger.rules.find((r) => !r.contains && r.match === match);
+        const rule: ImportRule = { ...existing, match, kind, category };
+        if ("label" in patch) rule.label = label;
+        if (rule.label === match) delete rule.label;
+        delete rule.ignore;
+        delete rule.person;
+        ledger.rules = [...ledger.rules.filter((r) => r !== existing), rule];
+      }
+    }
+    return changed;
+  });
+}
+
+/** Deletes several lines; returns how many existed. */
+export function bulkDeleteEntries(ids: string[]): Promise<number> {
+  const wanted = new Set(ids);
+  return update((ledger) => {
+    const before = ledger.entries.length;
+    ledger.entries = ledger.entries.filter((e) => !wanted.has(e.id));
+    return before - ledger.entries.length;
+  });
+}
+
 /** Returns false when the entry did not exist. */
 export function deleteEntry(id: string): Promise<boolean> {
   return update((ledger) => {

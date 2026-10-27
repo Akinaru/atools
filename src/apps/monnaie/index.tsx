@@ -1,20 +1,22 @@
 import { io } from "next/cache";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { App } from "../types";
 import { api } from "./api";
 import { MONTH_PATTERN, toDateString } from "./money";
 import { readLedger } from "./server/store";
 import { VIEW_COOKIES } from "./server/view";
 import { GoalsView } from "./ui/GoalsView";
-import { ImportView } from "./ui/ImportView";
+import { LinesView } from "./ui/LinesView";
 import { MonthView } from "./ui/MonthView";
-import { SettingsView } from "./ui/SettingsView";
+import { SETTINGS_TABS, SettingsView } from "./ui/SettingsView";
 import { YearView } from "./ui/YearView";
 
 async function Page({ path }: { path: string[] }) {
-  const [section, ...rest] = path;
-  if (rest.length) notFound();
+  const [section, sub, ...rest] = path;
+  if (rest.length || (sub && section !== "reglages")) notFound();
+  // The import moved into the settings.
+  if (section === "import") redirect("/apps/monnaie/reglages/import");
   // The default month and year depend on today's date.
   await io();
   const today = toDateString(new Date());
@@ -27,8 +29,12 @@ async function Page({ path }: { path: string[] }) {
   if (!section) return <MonthView ledger={ledger} month={month && MONTH_PATTERN.test(month) ? month : today.slice(0, 7)} today={today} />;
   if (section === "annee") return <YearView ledger={ledger} year={year && /^\d{4}$/.test(year) ? Number(year) : Number(today.slice(0, 4))} today={today} />;
   if (section === "objectifs") return <GoalsView ledger={ledger} />;
-  if (section === "reglages") return <SettingsView ledger={ledger} today={today} />;
-  if (section === "import") return <ImportView />;
+  if (section === "lignes") return <LinesView ledger={ledger} />;
+  if (section === "reglages") {
+    const tab = SETTINGS_TABS.find((t) => t.key === (sub ?? ""));
+    if (!tab) notFound();
+    return <SettingsView ledger={ledger} today={today} tab={tab.key} />;
+  }
   notFound();
 }
 
