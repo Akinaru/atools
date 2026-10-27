@@ -81,13 +81,13 @@ export type Settings = {
 };
 
 /** A livret (Livret A, Livret Jeune…): its balance is the sum of its savings lines. */
-export type SavingsAccount = { id: string; name: string; emoji: string };
+export type SavingsAccount = { id: string; name: string; emoji: string; /** Balance before its first line. */ start?: Cents };
 
 /**
  * A current account besides the main one (Revolut, Crédit Mutuel…). Its balance is the sum of its lines (its
  * history is imported from the start). Not `personal` (a business account): left out of the personal stats.
  */
-export type CurrentAccount = { id: string; name: string; emoji: string; personal: boolean };
+export type CurrentAccount = { id: string; name: string; emoji: string; personal: boolean; /** Balance before its first line. */ start?: Cents };
 
 /** The main current account, where lines without `account` happen; its balance comes from the checkpoints. */
 export const MAIN_ACCOUNT: CurrentAccount = { id: "courant", name: "Compte courant", emoji: "💳", personal: true };
@@ -274,9 +274,9 @@ export const lineCategoryLabel = (entry: Pick<Entry, "kind" | "category" | "acco
   return parts.join(" · ");
 };
 
-/** Balance of each savings account today; lines not attributed to a livret are under "". */
-export function savingsAccountBalances(ledger: Pick<Ledger, "entries">): Map<string, Cents> {
-  const balances = new Map<string, Cents>();
+/** Balance of each livret after `ledger.entries` (its start included); lines not attributed to a livret are under "". */
+export function savingsAccountBalances(ledger: Pick<Ledger, "entries" | "savingsAccounts">): Map<string, Cents> {
+  const balances = new Map<string, Cents>(ledger.savingsAccounts.map((a) => [a.id, a.start ?? 0]));
   for (const e of ledger.entries) if (e.kind === "savings") balances.set(e.livret ?? "", (balances.get(e.livret ?? "") ?? 0) + savingsDelta(e));
   return balances;
 }
@@ -446,7 +446,7 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
   const kept = income - charges - spent + debtFlow;
   const left = kept - saved;
   const upToMonth = ledger.entries.filter((e) => monthOf(e.date) <= month);
-  const savingsBalance = ledger.settings.savingsStart + upToMonth.reduce((n, e) => n + savingsDelta(e), 0);
+  const savingsBalance = savingsStartTotal(ledger) + upToMonth.reduce((n, e) => n + savingsDelta(e), 0);
   const accountBalance = accountBalanceAt(ledger, `${month}-${String(daysInMonth(month)).padStart(2, "0")}`);
 
   const perDay = Array.from({ length: daysInMonth(month) }, () => 0);
@@ -541,7 +541,10 @@ export const pendingRecurring = (ledger: Ledger, month: string) =>
   ledger.recurring.filter((r) => !ledger.entries.some((e) => e.recurringId === r.id && monthOf(e.date) === month));
 
 /** Savings account balance today. */
-export const savingsBalance = (ledger: Ledger): Cents => ledger.settings.savingsStart + ledger.entries.reduce((n, e) => n + savingsDelta(e), 0);
+export const savingsBalance = (ledger: Ledger): Cents => savingsStartTotal(ledger) + ledger.entries.reduce((n, e) => n + savingsDelta(e), 0);
+
+/** What the livrets held before their first lines: the setting plus each livret's start. */
+const savingsStartTotal = (ledger: Pick<Ledger, "settings" | "savingsAccounts">) => ledger.settings.savingsStart + ledger.savingsAccounts.reduce((n, a) => n + (a.start ?? 0), 0);
 
 /** The day an entry hits the account balance: the bank's booking day when known, else the payment day. */
 const balanceDate = (e: Entry) => e.bookedDate ?? e.date;
@@ -591,8 +594,8 @@ export function accountLevels(ledger: Ledger, months: string[], today: string): 
   const flowAt = (end: string, account: string) => ledger.entries.reduce((n, e) => (balanceDate(e) <= end ? n + accountFlow(e, account) : n), 0);
   const levels: AccountLevels[] = [
     { ...MAIN_ACCOUNT, type: "courant", values: ends.map((end, i) => (known(i) ? accountBalanceAt(ledger, end > today ? today : end) : null)) },
-    ...ledger.accounts.map((a) => ({ ...a, type: "courant" as const, values: ends.map((end, i) => (known(i) ? flowAt(end, a.id) : null)) })),
-    ...ledger.savingsAccounts.map((a) => ({ ...a, type: "livret" as const, personal: true, values: ends.map((end, i) => (known(i) ? savingsAt(end, a.id) : null)) })),
+    ...ledger.accounts.map((a) => ({ ...a, type: "courant" as const, values: ends.map((end, i) => (known(i) ? (a.start ?? 0) + flowAt(end, a.id) : null)) })),
+    ...ledger.savingsAccounts.map((a) => ({ ...a, type: "livret" as const, personal: true, values: ends.map((end, i) => (known(i) ? (a.start ?? 0) + savingsAt(end, a.id) : null)) })),
   ];
   const loose = ends.map((end, i) => (known(i) ? ledger.settings.savingsStart + savingsAt(end, "") : null));
   if (loose.some((v) => v)) levels.push({ id: "", name: "Épargne sans livret", emoji: "🪙", type: "livret", personal: true, values: loose });

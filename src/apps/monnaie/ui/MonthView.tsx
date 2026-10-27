@@ -34,7 +34,7 @@ import { BASE, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, Sta
 export function MonthView({ ledger, month, today }: { ledger: Ledger; month: string; today: string }) {
   const stats = monthStats(ledger, month);
   // Balance of each livret at the end of the month.
-  const livrets = savingsAccountBalances({ entries: ledger.entries.filter((e) => monthOf(e.date) <= month) });
+  const livrets = savingsAccountBalances({ ...ledger, entries: ledger.entries.filter((e) => monthOf(e.date) <= month) });
   const previous = monthStats(ledger, shiftMonth(month, -1));
   const days = daysInMonth(month);
   const isCurrent = today.startsWith(month);

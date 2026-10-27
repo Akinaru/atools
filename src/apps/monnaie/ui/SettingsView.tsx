@@ -96,7 +96,7 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
                   emoji={a.emoji}
                   name={a.name}
                   hint={`${a.personal ? "" : "pro · "}${count} ligne${count > 1 ? "s" : ""}`}
-                  balance={ledger.entries.reduce((n, e) => n + accountFlow(e, a.id), 0)}
+                  balance={ledger.entries.reduce((n, e) => n + accountFlow(e, a.id), a.start ?? 0)}
                   remove={count ? undefined : removeCurrentAccount.bind(null, a.id)}
                 />
               );
