@@ -1,6 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { VIEW_COOKIES } from "./view";
 import { BankFileError, decodeBankFile, parseCaisseEpargneCsv, type BankOperation } from "../import/caisse-epargne";
 import { normalizeBankLabel, suggest, type Suggestion } from "../import/suggest";
 import { categoriesOf, MONTH_PATTERN, parseAmount, parseOptionalAmount, type Categories, type Kind } from "../money";
@@ -241,4 +244,33 @@ export async function updateCategoryBudgets(_prev: FormState, formData: FormData
     budgets[key.slice(7)] = amount;
   }
   return attempt(() => saveCategoryBudgets(budgets), "Budgets enregistrés.");
+}
+
+// --- Period shown (kept in a cookie, not in the URL) ---
+
+// Back to today after a while: opening the app later shows the current period again.
+const VIEW_MAX_AGE = 2 * 60 * 60;
+
+async function remember(name: string, value: string | null) {
+  const jar = await cookies();
+  if (value) jar.set(name, value, { path: "/", httpOnly: true, sameSite: "lax", maxAge: VIEW_MAX_AGE });
+  else jar.delete(name);
+}
+
+/** Shows another month in place (null: the current month). */
+export async function showMonth(month: string | null) {
+  await remember(VIEW_COOKIES.month, month && MONTH_PATTERN.test(month) ? month : null);
+  refresh();
+}
+
+/** Shows another year in place (null: the current year). */
+export async function showYear(year: number | null) {
+  await remember(VIEW_COOKIES.year, year && Number.isInteger(year) && year > 1900 && year < 3000 ? String(year) : null);
+  refresh();
+}
+
+/** Opens a month from elsewhere (the year table): remembers it and goes to the month page. */
+export async function openMonth(month: string) {
+  await remember(VIEW_COOKIES.month, MONTH_PATTERN.test(month) ? month : null);
+  redirect("/apps/monnaie");
 }

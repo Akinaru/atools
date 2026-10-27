@@ -1,9 +1,11 @@
 import { io } from "next/cache";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import type { App } from "../types";
 import { api } from "./api";
 import { MONTH_PATTERN, toDateString } from "./money";
 import { readLedger } from "./server/store";
+import { VIEW_COOKIES } from "./server/view";
 import { GoalsView } from "./ui/GoalsView";
 import { ImportView } from "./ui/ImportView";
 import { OperationsView } from "./ui/OperationsView";
@@ -12,20 +14,23 @@ import { SettingsView } from "./ui/SettingsView";
 import { YearView } from "./ui/YearView";
 
 async function Page({ path }: { path: string[] }) {
-  const [section, param, ...rest] = path;
+  const [section, ...rest] = path;
   if (rest.length) notFound();
   // The default month and year depend on today's date.
   await io();
   const today = toDateString(new Date());
   const ledger = await readLedger();
+  // The month / year shown is remembered in a cookie by the ◀ ▶ buttons, so the URL stays the same.
+  const jar = await cookies();
+  const month = jar.get(VIEW_COOKIES.month)?.value;
+  const year = jar.get(VIEW_COOKIES.year)?.value;
 
-  if (!section) return <MonthView ledger={ledger} month={today.slice(0, 7)} today={today} />;
-  if (section === "mois" && param && MONTH_PATTERN.test(param)) return <MonthView ledger={ledger} month={param} today={today} />;
-  if (section === "annee" && (!param || /^\d{4}$/.test(param))) return <YearView ledger={ledger} year={Number(param ?? today.slice(0, 4))} today={today} />;
-  if (section === "objectifs" && !param) return <GoalsView ledger={ledger} />;
-  if (section === "reglages" && !param) return <SettingsView ledger={ledger} today={today} />;
-  if (section === "import" && !param) return <ImportView />;
-  if (section === "operations" && !param) return <OperationsView ledger={ledger} />;
+  if (!section) return <MonthView ledger={ledger} month={month && MONTH_PATTERN.test(month) ? month : today.slice(0, 7)} today={today} />;
+  if (section === "annee") return <YearView ledger={ledger} year={year && /^\d{4}$/.test(year) ? Number(year) : Number(today.slice(0, 4))} today={today} />;
+  if (section === "objectifs") return <GoalsView ledger={ledger} />;
+  if (section === "reglages") return <SettingsView ledger={ledger} today={today} />;
+  if (section === "import") return <ImportView />;
+  if (section === "operations") return <OperationsView ledger={ledger} />;
   notFound();
 }
 

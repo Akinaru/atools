@@ -1,8 +1,11 @@
-import type { CSSProperties } from "react";
+"use client";
+
+import { useOptimistic, useState, useTransition, type CSSProperties } from "react";
 import { dayParts, formatSigned, getCategory, monthShortName, savingsDelta, signedAmount, type Categories, type Entry, type Kind } from "../money";
 import { flipRegret, removeEntry } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { squareClass } from "./kit";
+import { useBusy } from "./motion";
 
 /** Sticker and amount colors: plaisir in accent, charges in grey, income in white, livret in yellow. */
 const STICKER: Record<Kind, string> = {
@@ -54,9 +57,32 @@ export function EntryList({ entries, categories, labelCounts = {} }: { entries: 
   );
 }
 
-/** One entry as a slightly tilted ticket: sticker, label, amount; actions show on hover. */
+/**
+ * One entry as a slightly tilted ticket: sticker, label, amount; actions show on hover. Deleting and
+ * regretting are optimistic: the row reacts at once, the server follows (and the row comes back on error).
+ */
 function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; categories: Categories; sameLabel: number; tilt: number }) {
   const category = getCategory(entry.kind, entry.category, categories);
+  const [pending, startTransition] = useTransition();
+  const [regret, setRegret] = useOptimistic(entry.regret);
+  const [removing, setRemoving] = useState(false);
+  useBusy(pending);
+
+  const remove = () => {
+    setRemoving(true);
+    startTransition(async () => {
+      try {
+        await removeEntry(entry.id);
+      } catch {
+        setRemoving(false);
+      }
+    });
+  };
+  const toggleRegret = () =>
+    startTransition(async () => {
+      setRegret(!regret);
+      await flipRegret(entry.id);
+    });
   // A savings transfer shows its effect on its pocket (+ put aside, − taken back), an IOU its amount;
   // the rest, its effect on the current account.
   const amount =
@@ -67,7 +93,8 @@ function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; catego
         : signedAmount(entry);
   return (
     <li
-      className="mn-shape group flex items-center gap-4 py-3 pl-3 pr-4 drop-shadow-[0.3rem_0.35rem_0_rgba(0,0,0,0.45)] transition-transform duration-150 [transform:rotate(var(--mn-tilt))] hover:[transform:translateY(-2px)_rotate(0deg)] sm:pl-4"
+      className={`mn-shape group flex items-center gap-4 py-3 pl-3 pr-4 drop-shadow-[0.3rem_0.35rem_0_rgba(0,0,0,0.45)] transition-transform duration-150 [transform:rotate(var(--mn-tilt))] hover:[transform:translateY(-2px)_rotate(0deg)] sm:pl-4 ${removing ? "mn-row-out" : ""}`}
+      aria-busy={pending}
       style={{ "--mn-shape": "var(--mn-panel-2)", "--mn-tilt": `${tilt}deg` } as CSSProperties}
     >
       <span
@@ -91,8 +118,8 @@ function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; catego
                   ⟳
                 </span>
               )}
-              {entry.regret && (
-                <span className="mn-punch shrink-0 -rotate-3 border-2 border-[var(--mn-red)] px-1.5 pt-0.5 text-xs text-[var(--mn-red)]">Regret</span>
+              {regret && (
+                <span className="mn-punch mn-pop shrink-0 -rotate-3 border-2 border-[var(--mn-red)] px-1.5 pt-0.5 text-xs text-[var(--mn-red)]">Regret</span>
               )}
             </span>
             <span className="block truncate text-sm text-[var(--mn-muted)]">
@@ -107,21 +134,20 @@ function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; catego
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <span className="flex gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           {entry.kind === "expense" && (
-            <form action={flipRegret.bind(null, entry.id)}>
-              <button
-                title={entry.regret ? "Finalement j'assume" : "Je regrette"}
-                aria-label={entry.regret ? `Ne plus regretter ${entry.label}` : `Regretter ${entry.label}`}
-                className={`${squareClass()} text-lg ${entry.regret ? "" : "grayscale"}`}
-              >
-                😬
-              </button>
-            </form>
-          )}
-          <form action={removeEntry.bind(null, entry.id)}>
-            <button title="Supprimer" aria-label={`Supprimer ${entry.label}`} className={squareClass()}>
-              ✕
+            <button
+              type="button"
+              onClick={toggleRegret}
+              title={regret ? "Finalement j'assume" : "Je regrette"}
+              aria-label={regret ? `Ne plus regretter ${entry.label}` : `Regretter ${entry.label}`}
+              aria-pressed={regret}
+              className={`${squareClass()} text-lg ${regret ? "" : "grayscale"}`}
+            >
+              😬
             </button>
-          </form>
+          )}
+          <button type="button" onClick={remove} disabled={removing} title="Supprimer" aria-label={`Supprimer ${entry.label}`} className={squareClass()}>
+            ✕
+          </button>
         </span>
         <span className={`mn-punch min-w-28 text-right text-2xl sm:text-3xl ${AMOUNT[entry.kind]}`}>
           {formatSigned(amount)}

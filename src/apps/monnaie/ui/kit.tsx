@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Barlow, Lilita_One } from "next/font/google";
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { LinkPending, RouteTransition, TopBar } from "./motion";
 import "./monnaie.css";
 
 const punch = Lilita_One({ variable: "--font-punch", weight: "400", subsets: ["latin", "latin-ext"] });
@@ -103,15 +104,6 @@ export function Stamp({ children, tone = "red", tilt: deg = -9, className = "" }
 export const buttonClass = (variant: "accent" | "dark" = "accent", size: "md" | "sm" = "md") =>
   `mn-btn mn-punch ${size === "sm" ? "mn-btn--sm text-base" : "text-xl"} ${variant === "dark" ? "mn-btn--dark" : ""}`;
 
-/** Big layered button (link or button). */
-export function ButtonLink({ variant, size, children, ...props }: ComponentProps<typeof Link> & { variant?: "accent" | "dark"; size?: "md" | "sm" }) {
-  return (
-    <Link {...props} className={buttonClass(variant, size)}>
-      <span>{children}</span>
-    </Link>
-  );
-}
-
 /** Square icon button (arrows, ✕). */
 export const squareClass = (light = false) => `mn-square ${light ? "mn-square--light" : ""}`;
 
@@ -134,7 +126,8 @@ export function Screen({
 }) {
   const index = NAV.findIndex((n) => n.key === section);
   return (
-    <main className={`${punch.variable} ${barlow.variable} mn relative mx-3 mt-4 flex-1 overflow-hidden rounded-[2rem] px-5 pb-10 pt-6 sm:mx-6 sm:px-10`}>
+    <main className={`${punch.variable} ${barlow.variable} mn relative min-h-screen flex-1 overflow-hidden px-5 pb-10 pt-6 sm:px-10`}>
+      <TopBar />
       <header className="flex items-start justify-between gap-6">
         <Link href={BASE} className="group flex items-center gap-4">
           <Crosshair className="h-11 w-11 text-white transition-transform duration-300 group-hover:rotate-45" />
@@ -150,8 +143,9 @@ export function Screen({
                 {item.label}
               </Slab>
             ) : (
-              <Link key={item.key} href={item.href} className="mn-punch mn-ghost inline-block pt-2 text-3xl">
+              <Link key={item.key} href={item.href} className="mn-punch mn-ghost relative inline-block pt-2 text-3xl">
                 {item.label}
+                <LinkPending />
               </Link>
             ),
           )}
@@ -164,23 +158,26 @@ export function Screen({
               {item.label}
             </Slab>
           ) : (
-            <Link key={item.key} href={item.href} className="mn-punch mn-ghost shrink-0 pt-2 text-xl">
+            <Link key={item.key} href={item.href} className="mn-punch mn-ghost relative shrink-0 pt-2 text-xl">
               {item.label}
+              <LinkPending />
             </Link>
           ),
         )}
       </nav>
 
-      <div className="mt-12 flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <h1 className="mn-punch mn-title mn-drop text-6xl sm:text-8xl" style={tilt(-1.5)}>
-            {title}
-          </h1>
-          {subtitle && <div className="mt-4 text-base text-[var(--mn-muted)]">{subtitle}</div>}
+      <RouteTransition>
+        <div className="mt-12 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <h1 className="mn-punch mn-title mn-drop text-6xl sm:text-8xl" style={tilt(-1.5)}>
+              {title}
+            </h1>
+            {subtitle && <div className="mt-4 text-base text-[var(--mn-muted)]">{subtitle}</div>}
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-4">{actions}</div>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-4">{actions}</div>}
-      </div>
-      <div className="mt-12">{children}</div>
+        <div className="mt-12">{children}</div>
+      </RouteTransition>
 
       <footer className="mt-14 flex flex-wrap justify-between gap-3">
         <Tag>Monnaie, {NAV[index].label.toLowerCase()}</Tag>

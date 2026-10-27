@@ -274,8 +274,94 @@
   animation: mn-slam 0.45s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 
+/* --- Live feel: progress bar, pending states, page and row transitions --- */
+
+.mn-topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 0.3rem;
+  background: repeating-linear-gradient(115deg, var(--mn-accent) 0 1.2rem, var(--mn-yellow) 1.2rem 2.4rem);
+  background-size: 200% 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease-out, opacity 0.3s ease 0.15s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+:root.mn-busy .mn-topbar {
+  opacity: 1;
+  transform: scaleX(0.85);
+  transition: transform 2.5s cubic-bezier(0.1, 0.7, 0.2, 1), opacity 0.1s;
+  animation: mn-stripes 0.6s linear infinite;
+}
+
+@keyframes mn-stripes {
+  to { background-position: -2.4rem 0; }
+}
+
+@keyframes mn-wobble {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-4deg) scale(0.97); }
+  75% { transform: rotate(4deg) scale(0.97); }
+}
+
+.mn-pending {
+  animation: mn-wobble 0.3s steps(3, end) infinite;
+  opacity: 0.75;
+}
+
+.mn-link-pending {
+  position: absolute;
+  inset: auto 0 -0.35rem 0;
+  height: 0.25rem;
+  background: var(--mn-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.mn-link-pending.is-pending {
+  animation: mn-link-load 0.8s cubic-bezier(0.3, 0.7, 0.3, 1) infinite;
+}
+
+@keyframes mn-link-load {
+  0% { transform: scaleX(0); }
+  70% { transform: scaleX(1); }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* A page (another month, another section) slides in instead of being swapped at once. */
+@keyframes mn-route-in {
+  from { opacity: 0; transform: translateY(0.9rem); }
+}
+
+.mn-route {
+  animation: mn-route-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* Deleted line: folds and flies away before the server even answers. */
+@keyframes mn-row-out {
+  to { opacity: 0; transform: translateX(3rem) rotate(4deg) scale(0.92); }
+}
+
+.mn-row-out {
+  animation: mn-row-out 0.28s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  pointer-events: none;
+}
+
+@keyframes mn-pop {
+  0% { transform: scale(0.4) rotate(-14deg); opacity: 0; }
+  70% { transform: scale(1.15) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-3deg); }
+}
+
+.mn-pop {
+  animation: mn-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mn-drop, .mn-grow, .mn-slam, .mn-draw, .mn-boil::before, .mn-btn::before { animation: none; }
+  .mn-drop, .mn-grow, .mn-slam, .mn-draw, .mn-route, .mn-pop, .mn-pending, .mn-link-pending, .mn-boil::before, .mn-btn::before { animation: none; }
 }
 
 /* --- Forms --- */

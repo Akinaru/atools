@@ -17,13 +17,14 @@ import {
   type Ledger,
 } from "../money";
 import { categoryAverages, forecast } from "../insights";
-import { addRecurringToMonth } from "../server/actions";
+import { addRecurringToMonth, showMonth } from "../server/actions";
 import { CategoryBars } from "./charts";
 import { MonthCompareChart } from "./MonthCompareChart";
 import { EntryDialog } from "./EntryDialog";
 import { OperationsClient } from "./OperationsClient";
-import { KeyNav } from "./KeyNav";
-import { BASE, ButtonLink, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, squareClass, Stamp, Tag } from "./kit";
+import { ActionButton, AnimatedMoney } from "./motion";
+import { ViewNav } from "./ViewNav";
+import { BASE, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, Stamp, Tag } from "./kit";
 
 /** Dashboard of one month. `today` is YYYY-MM-DD. */
 export function MonthView({ ledger, month, today }: { ledger: Ledger; month: string; today: string }) {
@@ -69,20 +70,14 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
       hints={["← → changer de mois", "X ajouter"]}
       actions={
         <>
-          <KeyNav prev={`${BASE}/mois/${shiftMonth(month, -1)}`} next={`${BASE}/mois/${shiftMonth(month, 1)}`} />
-          <div className="flex items-center gap-2">
-            <Link href={`${BASE}/mois/${shiftMonth(month, -1)}`} className={squareClass()} aria-label="Mois précédent">
-              ◀
-            </Link>
-            <Link href={`${BASE}/mois/${shiftMonth(month, 1)}`} className={squareClass()} aria-label="Mois suivant">
-              ▶
-            </Link>
-          </div>
-          {!isCurrent && (
-            <ButtonLink href={BASE} variant="dark" size="sm">
-              Aujourd&apos;hui
-            </ButtonLink>
-          )}
+          <ViewNav
+            prev={showMonth.bind(null, shiftMonth(month, -1))}
+            next={showMonth.bind(null, shiftMonth(month, 1))}
+            today={showMonth.bind(null, null)}
+            isToday={isCurrent}
+            prevLabel="Mois précédent"
+            nextLabel="Mois suivant"
+          />
           <EntryDialog categories={categories} defaultDate={defaultDate} hotkey people={people} />
         </>
       }
@@ -93,11 +88,9 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             <span className="mn-punch mr-2 text-xl text-[var(--mn-accent)]">⟳ {pending.length} récurrent{pending.length > 1 ? "s" : ""}</span>
             pas encore dans ce mois : {pending.map((r) => r.label).join(", ")}.
           </p>
-          <form action={addRecurringToMonth.bind(null, month)}>
-            <button className={buttonClass("accent", "sm")}>
-              <span>Ajouter</span>
-            </button>
-          </form>
+          <ActionButton action={addRecurringToMonth.bind(null, month)} className={buttonClass("accent", "sm")}>
+            <span>Ajouter</span>
+          </ActionButton>
         </div>
       )}
 
@@ -106,9 +99,10 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
         <Paper tilt={-1}>
           {stats.kept < 0 && <Stamp className="right-6 top-8 text-2xl">Dans le rouge</Stamp>}
           <Tag className="!text-zinc-500">Bilan {monthName(month).match(/^[aeiouy]/i) ? "d'" : "de "}{monthName(month)}</Tag>
-          <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-2">
-            <p className={`mn-punch text-7xl sm:text-8xl ${stats.kept < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatSigned(stats.kept)}</p>
-            <p className="max-w-xs pb-2 font-semibold text-zinc-600">
+          {/* Sentence under the number: only the number changes width while it rolls, nothing around it reflows. */}
+          <div className="mt-2 grid gap-2">
+            <p className={`mn-punch text-7xl sm:text-8xl ${stats.kept < 0 ? "text-[var(--mn-red)]" : ""}`}><AnimatedMoney value={stats.kept} signed /></p>
+            <p className="font-semibold text-zinc-600">
               {stats.kept < 0 ? "dépensé en plus de ce que tu as gagné." : "gardé sur ce que tu as gagné."}
               {previous.entries.length > 0 && (
                 <b className="block text-[var(--mn-ink)]">
@@ -129,10 +123,10 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             </span>
           </div>
           <div className={`mt-7 grid grid-cols-2 gap-4 border-t-2 border-dashed border-zinc-200 pt-5 ${stats.debtFlow ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
-            <MiniStat label="Encaissé" value={formatMoney(stats.income)} />
-            <MiniStat label="Charges" value={formatSigned(-stats.charges)} muted />
-            <MiniStat label="Plaisir" value={formatSigned(-stats.spent)} accent />
-            {stats.debtFlow !== 0 && <MiniStat label="Dettes" value={formatSigned(stats.debtFlow)} muted />}
+            <MiniStat label="Encaissé" value={stats.income} />
+            <MiniStat label="Charges" value={-stats.charges} signed muted />
+            <MiniStat label="Plaisir" value={-stats.spent} signed accent />
+            {stats.debtFlow !== 0 && <MiniStat label="Dettes" value={stats.debtFlow} signed muted />}
           </div>
           {(stats.biggest || stats.regret > 0) && (
             <ul className="mt-5 grid gap-1.5 text-sm text-zinc-600">
@@ -172,7 +166,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
               </p>
             ) : (
               <>
-                <p className={`mn-punch mt-2 text-5xl ${balance < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatMoney(balance)}</p>
+                <p className={`mn-punch mt-2 text-5xl ${balance < 0 ? "text-[var(--mn-red)]" : ""}`}><AnimatedMoney value={balance} /></p>
                 <p className="mt-1 text-[var(--mn-muted)]">
                   {isCurrent && outlook.endOfMonth !== null ? (
                     <>
@@ -227,7 +221,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
               {stats.savingsRate !== null && <span className="mn-punch text-2xl text-[var(--mn-yellow)]">{Math.round(stats.savingsRate * 100)} %</span>}
             </div>
             <p className={`mn-punch mt-2 text-4xl ${putAside < 0 ? "text-[var(--mn-red)]" : ""}`}>
-              {formatSigned(putAside)} <span className="text-lg text-[var(--mn-muted)]">mis de côté</span>
+              <AnimatedMoney value={putAside} signed /> <span className="text-lg text-[var(--mn-muted)]">mis de côté</span>
             </p>
             <p className="mt-1 text-[var(--mn-muted)]">
               Solde du livret : {formatMoney(stats.savingsBalance)}
@@ -329,11 +323,11 @@ function TotalsList({ title, totals, total, empty }: { title: string; totals: Ca
 }
 
 /** Small label + number of the month's breakdown, under the big result. */
-function MiniStat({ label, value, muted = false, accent = false }: { label: string; value: string; muted?: boolean; accent?: boolean }) {
+function MiniStat({ label, value, signed = false, muted = false, accent = false }: { label: string; value: number; signed?: boolean; muted?: boolean; accent?: boolean }) {
   return (
     <div>
       <div className="text-xs font-bold uppercase tracking-wider text-zinc-500">{label}</div>
-      <div className={`mn-punch text-2xl ${accent ? "text-[var(--mn-accent)]" : muted ? "text-zinc-500" : ""}`}>{value}</div>
+      <div className={`mn-punch text-2xl ${accent ? "text-[var(--mn-accent)]" : muted ? "text-zinc-500" : ""}`}><AnimatedMoney value={value} signed={signed} /></div>
     </div>
   );
 }

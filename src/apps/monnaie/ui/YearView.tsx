@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { formatMoney, formatSigned, KIND_LABELS, monthName, yearStats, type Ledger } from "../money";
 import { detectRecurring } from "../insights";
+import { openMonth, showYear } from "../server/actions";
 import { CategoryBars, YearChart } from "./charts";
-import { KeyNav } from "./KeyNav";
-import { BASE, Diamond, Panel, PanelTitle, Paper, Screen, squareClass, Stamp, Tag } from "./kit";
+import { Diamond, Panel, PanelTitle, Paper, Screen, Stamp, Tag } from "./kit";
+import { AnimatedMoney, PendingButton } from "./motion";
+import { ViewNav } from "./ViewNav";
 
 /** Overview of a year: totals, month by month chart and table. `today` is YYYY-MM-DD. */
 export function YearView({ ledger, year, today }: { ledger: Ledger; year: number; today: string }) {
@@ -31,22 +32,21 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
       subtitle={`${active.length} mois remplis sur 12`}
       hints={["← → changer d'année"]}
       actions={
-        <div className="flex items-center gap-2">
-          <KeyNav prev={`${BASE}/annee/${year - 1}`} next={`${BASE}/annee/${year + 1}`} />
-          <Link href={`${BASE}/annee/${year - 1}`} className={squareClass()} aria-label={`Année ${year - 1}`}>
-            ◀
-          </Link>
-          <Link href={`${BASE}/annee/${year + 1}`} className={squareClass()} aria-label={`Année ${year + 1}`}>
-            ▶
-          </Link>
-        </div>
+        <ViewNav
+          prev={showYear.bind(null, year - 1)}
+          next={showYear.bind(null, year + 1)}
+          today={showYear.bind(null, null)}
+          isToday={year === Number(today.slice(0, 4))}
+          prevLabel={`Année ${year - 1}`}
+          nextLabel={`Année ${year + 1}`}
+        />
       }
     >
       <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
         <Paper tilt={-1}>
           {yearAside < 0 && <Stamp className="right-6 top-8 text-2xl">Pioché</Stamp>}
           <Tag className="!text-zinc-500">Bilan {year}</Tag>
-          <p className={`mn-punch mt-2 text-6xl sm:text-7xl ${yearAside < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatSigned(yearAside)}</p>
+          <p className={`mn-punch mt-2 text-6xl sm:text-7xl ${yearAside < 0 ? "text-[var(--mn-red)]" : ""}`}><AnimatedMoney value={yearAside} signed /></p>
           <p className="mt-1 font-semibold text-zinc-500">
             mis sur le livret{savingsRate !== null && ` · ${savingsRate} % de ce que tu as gagné`}
           </p>
@@ -165,9 +165,11 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
                 {stats.months.map((m) => (
                   <tr key={m.month} className={m.entries.length ? "" : "text-zinc-600"}>
                     <td className="py-2.5">
-                      <Link href={`${BASE}/mois/${m.month}`} className="mn-punch text-base capitalize hover:text-[var(--mn-accent)]">
-                        {monthName(m.month)}
-                      </Link>
+                      <form action={openMonth.bind(null, m.month)}>
+                        <PendingButton className="mn-punch text-base capitalize hover:text-[var(--mn-accent)]" title={`Voir ${monthName(m.month)}`}>
+                          {monthName(m.month)}
+                        </PendingButton>
+                      </form>
                     </td>
                     <td className="py-2.5 text-right font-semibold">{formatMoney(m.income)}</td>
                     <td className="py-2.5 text-right font-semibold text-zinc-400">{formatMoney(m.charges)}</td>

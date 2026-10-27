@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, type Ledger } from "../money";
 import { removeCategory, removeCheckpoint, removeRecurring, removeRule } from "../server/actions";
 import { CategoryBudgetsForm, CategoryForm, CheckpointForm, RecurringForm, RestoreForm, SettingsForm } from "./forms";
+import { PendingButton } from "./motion";
 import { buttonClass, Panel, PanelTitle, Paper, Screen, squareClass, Tag } from "./kit";
 
 export function SettingsView({ ledger, today }: { ledger: Ledger; today: string }) {
@@ -55,9 +56,9 @@ export function SettingsView({ ledger, today }: { ledger: Ledger; today: string 
                   </span>
                 )}
                 <form action={removeCheckpoint.bind(null, checkpoint.id)}>
-                  <button className={squareClass()} aria-label={`Supprimer le pointage du ${checkpoint.date}`}>
+                  <PendingButton className={squareClass()} label={`Supprimer le pointage du ${checkpoint.date}`}>
                     ✕
-                  </button>
+                  </PendingButton>
                 </form>
               </li>
             ))}
@@ -90,9 +91,9 @@ export function SettingsView({ ledger, today }: { ledger: Ledger; today: string 
                     </span>
                   </span>
                   <form action={removeCategory.bind(null, c.id)}>
-                    <button className={squareClass()} aria-label={`Supprimer la catégorie ${c.label}`} title="Supprimer (ses lignes passent en « Autre »)">
+                    <PendingButton className={squareClass()} label={`Supprimer la catégorie ${c.label}`} title="Supprimer (ses lignes passent en « Autre »)">
                       ✕
-                    </button>
+                    </PendingButton>
                   </form>
                 </li>
               );
@@ -129,9 +130,9 @@ export function SettingsView({ ledger, today }: { ledger: Ledger; today: string 
                   </span>
                   <span className={`mn-punch text-xl ${r.kind === "expense" ? "text-[var(--mn-accent)]" : ""}`}>{formatMoney(r.amount)}</span>
                   <form action={removeRecurring.bind(null, r.id)}>
-                    <button className={squareClass()} aria-label={`Supprimer ${r.label}`}>
+                    <PendingButton className={squareClass()} label={`Supprimer ${r.label}`}>
                       ✕
-                    </button>
+                    </PendingButton>
                   </form>
                 </li>
               );
@@ -161,9 +162,9 @@ export function SettingsView({ ledger, today }: { ledger: Ledger; today: string 
                     </span>
                   </span>
                   <form action={removeRule.bind(null, rule.match)}>
-                    <button className={squareClass()} aria-label={`Supprimer la règle ${rule.match}`}>
+                    <PendingButton className={squareClass()} label={`Supprimer la règle ${rule.match}`}>
                       ✕
-                    </button>
+                    </PendingButton>
                   </form>
                 </li>
               ))}
