@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
+    // Track security releases: Next.js suggests security-only upgrades.
+    agentUpgrade: "security",
     // Tools upload files through Server Actions (e.g. Switch saves are several MB).
     serverActions: { bodySizeLimit: "64mb" },
   },
