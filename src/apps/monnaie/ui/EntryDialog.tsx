@@ -28,6 +28,8 @@ export function EntryDialog({
   entry,
   trigger,
   hotkey = false,
+  startOpen = false,
+  onClose,
   people = [],
   categories,
   names = { accounts: [MAIN_ACCOUNT], livrets: [] },
@@ -44,6 +46,9 @@ export function EntryDialog({
   trigger?: ReactNode;
   hotkey?: boolean;
   people?: string[];
+  /** Opened by someone else (no button of its own): open at once, `onClose` when closed. */
+  startOpen?: boolean;
+  onClose?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -60,6 +65,12 @@ export function EntryDialog({
     playSound("select");
     dialog.current?.showModal();
   };
+
+  useEffect(() => {
+    if (startOpen) open();
+    // Once, when mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!hotkey) return;
@@ -82,10 +93,12 @@ export function EntryDialog({
 
   return (
     <>
-      <button type="button" onClick={open} className={trigger ? "min-w-0 flex-1 text-left" : buttonClass()}>
-        {trigger ?? <span>+ Ajouter</span>}
-      </button>
-      <dialog ref={dialog} className="m-auto w-[min(34rem,94vw)] bg-transparent p-0">
+      {!startOpen && (
+        <button type="button" onClick={open} className={trigger ? "min-w-0 flex-1 text-left" : buttonClass()}>
+          {trigger ?? <span>+ Ajouter</span>}
+        </button>
+      )}
+      <dialog ref={dialog} onClose={onClose} className="m-auto w-[min(34rem,94vw)] bg-transparent p-0">
         <div className="mn-shape mn-paper p-7 sm:p-9">
           <form ref={form} action={action} className="grid gap-5">
             {entry && <input type="hidden" name="id" value={entry.id} />}

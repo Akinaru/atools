@@ -120,9 +120,9 @@ export function categoryAverages(ledger: Ledger, month: string, kind: "expense" 
 }
 
 /** One line, as the hover cards of the year page show it. */
-export type LineDetail = { date: string; label: string; amount: Cents; emoji?: string };
+export type LineDetail = { id: string; date: string; label: string; amount: Cents; emoji?: string };
 
-/** One category over a year: total, month by month, and where the money went (top labels). */
+/** One category over a year: total, month by month, and where the money went (every label, biggest first). */
 export type CategoryYear = {
   category: Category;
   total: Cents;
@@ -141,7 +141,7 @@ export function categoryYear(ledger: Ledger, year: number, kind: "expense" | "ch
     if (e.kind !== kind || !e.date.startsWith(`${year}-`)) continue;
     const category = getCategory(kind, e.category, categories);
     const row = byId.get(category.id) ?? { category, total: 0, count: 0, months: Array.from({ length: 12 }, () => 0), lines: [] as LineDetail[], top: [], labels: new Map() };
-    const line = { date: e.date, label: e.label, amount: e.amount };
+    const line = { id: e.id, date: e.date, label: e.label, amount: e.amount };
     row.total += e.amount;
     row.count++;
     row.months[Number(e.date.slice(5, 7)) - 1] += e.amount;
@@ -157,8 +157,7 @@ export function categoryYear(ledger: Ledger, year: number, kind: "expense" | "ch
       lines: row.lines.sort(byDate),
       top: [...labels]
         .map(([label, v]) => ({ label, ...v, lines: v.lines.sort(byDate) }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6),
+        .sort((a, b) => b.total - a.total),
     }))
     .sort((a, b) => b.total - a.total);
 }
@@ -174,7 +173,7 @@ export function dailySpending(ledger: Ledger, year: number): Record<string, DayS
   for (const e of ledger.entries) {
     if (e.kind !== "expense" || !e.date.startsWith(`${year}-`)) continue;
     const day = days[e.date] ?? { amount: 0, count: 0, lines: [] };
-    const line = { date: e.date, label: e.label, amount: e.amount, emoji: getCategory(e.kind, e.category, categories).emoji };
+    const line = { id: e.id, date: e.date, label: e.label, amount: e.amount, emoji: getCategory(e.kind, e.category, categories).emoji };
     days[e.date] = { amount: day.amount + e.amount, count: day.count + 1, lines: [...day.lines, line].sort((a, b) => b.amount - a.amount) };
   }
   return days;

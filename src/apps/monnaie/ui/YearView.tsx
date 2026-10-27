@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import { categoryYear, dailySpending, detectRecurring } from "../insights";
-import { accountLevels, personalLedger, formatMoney, formatSigned, KIND_LABELS, monthName, yearStats, type Ledger } from "../money";
+import { accountLevels, accountNamesOf, categoriesOf, personalLedger, formatMoney, formatSigned, KIND_LABELS, monthName, yearStats, type Ledger } from "../money";
 import { showYear } from "../server/actions";
 import { Panel, PanelTitle, Paper, Screen, Stamp, Tag } from "./kit";
+import { EntryEditor } from "./EntryEditor";
 import { AnimatedMoney } from "./motion";
 import { ViewNav } from "./ViewNav";
 import { AccountLevelsChart, CategoryExplorer, SpendingCalendar, YearFlowChart, type YearMonth } from "./YearCharts";
@@ -113,15 +114,18 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
         <AccountLevelsChart months={levelMonths} levels={accountLevels(ledger, levelMonths, today)} />
       </Panel>
 
-      <Panel className="mt-6">
-        <PanelTitle aside={<Tag>clique une catégorie</Tag>}>Les catégories</PanelTitle>
-        <CategoryExplorer expense={categoryYear(mine, year, "expense")} charge={categoryYear(mine, year, "charge")} year={year} />
-      </Panel>
+      {/* The lines in the hover cards open in the edit dialog. */}
+      <EntryEditor entries={mine.entries.filter((e) => e.date.startsWith(`${year}-`))} categories={categoriesOf(ledger)} names={accountNamesOf(ledger)}>
+        <Panel className="mt-6">
+          <PanelTitle aside={<Tag>clique une catégorie · clique une ligne pour la modifier</Tag>}>Les catégories</PanelTitle>
+          <CategoryExplorer expense={categoryYear(mine, year, "expense")} charge={categoryYear(mine, year, "charge")} year={year} />
+        </Panel>
 
-      <Panel className="mt-6">
-        <PanelTitle aside={<Tag>plaisir, jour par jour</Tag>}>Le calendrier</PanelTitle>
-        <SpendingCalendar year={year} days={dailySpending(mine, year)} today={today} />
-      </Panel>
+        <Panel className="mt-6">
+          <PanelTitle aside={<Tag>plaisir, jour par jour · clique un jour</Tag>}>Le calendrier</PanelTitle>
+          <SpendingCalendar year={year} days={dailySpending(mine, year)} today={today} />
+        </Panel>
+      </EntryEditor>
 
       {recurring.length > 0 && (
         <Panel className="mt-6">

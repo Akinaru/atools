@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import type { CategoryYear, DaySpending, LineDetail } from "../insights";
 import { formatMoney, formatSigned, monthName, monthShortName, type AccountLevels, type Cents } from "../money";
 import { openMonth } from "../server/actions";
+import { useEditEntry } from "./EntryEditor";
 import { useBusy } from "./motion";
 
 // Interactive charts of the year page: hover to read, click to open a month or a category.
@@ -31,17 +32,54 @@ const dayMonth = (date: string) => localDate(date).toLocaleDateString("fr-FR", {
  * Hover card listing lines with their dates: the detail behind a bar or a day. Without labels (one label's
  * visits), the dates flow in three columns so that a frequent place still fits.
  */
-function LinesCard({ title, total, lines, max = 8, showLabel = true, showDate = true, className = "w-64", style }: { title: string; total: Cents; lines: LineDetail[]; max?: number; showLabel?: boolean; showDate?: boolean; className?: string; style?: CSSProperties }) {
+function LinesCard({
+  title,
+  total,
+  lines,
+  max = 8,
+  showLabel = true,
+  showDate = true,
+  className = "w-64",
+  style,
+  onClose,
+  interactive = true,
+}: {
+  title: string;
+  total: Cents;
+  lines: LineDetail[];
+  max?: number;
+  showLabel?: boolean;
+  showDate?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  /** Pinned card: a ✕ to put it away. */
+  onClose?: () => void;
+  /** False for a card that follows the pointer and can't be reached: clicks go through it. */
+  interactive?: boolean;
+}) {
+  // Each line opens in the edit dialog when the page offers it.
+  const editor = useEditEntry();
+  const edit = interactive ? editor : null;
   return (
-    <div className={`pointer-events-none absolute z-30 border-[3px] border-[var(--mn-ink)] bg-white p-3 text-[var(--mn-ink)] shadow-[4px_4px_0_var(--mn-ink)] ${className}`} style={style}>
+    <div className={`${edit ? "" : "pointer-events-none"} absolute z-30 border-[3px] border-[var(--mn-ink)] bg-white p-3 text-[var(--mn-ink)] shadow-[4px_4px_0_var(--mn-ink)] ${className}`} style={style}>
       <div className="flex items-baseline justify-between gap-3 border-b-2 border-dashed border-zinc-200 pb-1.5">
         <span className="mn-punch truncate text-base capitalize">{title}</span>
         <span className="mn-punch shrink-0 text-base text-[var(--mn-accent)]">{formatMoney(total)}</span>
+        {onClose && (
+          <button type="button" onClick={onClose} aria-label="Fermer" className="shrink-0 text-sm font-black hover:text-[var(--mn-accent)]">
+            ✕
+          </button>
+        )}
       </div>
       {lines.length ? (
         <ul className={`mt-1.5 grid gap-x-4 gap-y-1 text-[13px] ${showLabel ? "" : "grid-cols-3"}`}>
-          {lines.slice(0, max).map((l, i) => (
-            <li key={i} className="flex items-baseline gap-2">
+          {lines.slice(0, max).map((l) => (
+            <li
+              key={l.id}
+              className={`flex items-baseline gap-2 ${edit ? "-mx-1 cursor-pointer px-1 hover:bg-[var(--mn-accent)]" : ""}`}
+              onClick={edit ? () => edit(l.id) : undefined}
+              title={edit ? "Modifier" : undefined}
+            >
               {showDate && <span className="w-12 shrink-0 font-bold text-zinc-500">{dayMonth(l.date)}</span>}
               {showLabel && (
                 <span className="min-w-0 flex-1 truncate font-semibold">
@@ -371,7 +409,6 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = list.find((c) => c.category.id === selectedId) ?? list[0];
   const [hover, setHover] = useState<number | null>(null);
-  const [hoverTop, setHoverTop] = useState<string | null>(null);
   const total = list.reduce((n, c) => n + c.total, 0) || 1;
 
   const stats = useMemo(() => {
@@ -491,34 +528,7 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
                 </div>
               </div>
 
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Où ça part</p>
-                <ul className="grid gap-1" onPointerLeave={() => setHoverTop(null)}>
-                  {selected.top.map((t) => (
-                    <li
-                      key={t.label}
-                      tabIndex={0}
-                      onPointerEnter={() => setHoverTop(t.label)}
-                      onFocus={() => setHoverTop(t.label)}
-                      onBlur={() => setHoverTop(null)}
-                      className={`relative -mx-2 grid gap-1 px-2 py-1 outline-none transition ${hoverTop === t.label ? "bg-zinc-100" : ""}`}
-                    >
-                      <span className="flex justify-between gap-3 text-sm font-bold">
-                        <span className="truncate">{t.label}</span>
-                        <span className="shrink-0">
-                          {formatMoney(t.total)} <span className="font-semibold text-zinc-500">· {t.count}×</span>
-                        </span>
-                      </span>
-                      <span className="h-1.5 bg-zinc-200">
-                        <span className="block h-full transition-colors" style={{ width: `${(t.total / selected.top[0].total) * 100}%`, background: hoverTop === t.label ? "var(--mn-accent)" : "var(--mn-ink)" }} />
-                      </span>
-                      {hoverTop === t.label && (
-                        <LinesCard title={`${t.label} · ${t.count} passage${t.count > 1 ? "s" : ""}`} total={t.total} lines={t.lines} max={30} showLabel={false} className="bottom-full left-0 right-0 mb-1" />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <WhereItGoes key={`${kind}-${selected.category.id}`} top={selected.top} />
             </div>
           )}
         </div>
@@ -539,6 +549,9 @@ function Fact({ label, value }: { label: string; value: string }) {
 /** Plaisir spent day by day over the year, GitHub style: the darker, the more; hover a day to read it. */
 export function SpendingCalendar({ year, days, today }: { year: number; days: Record<string, DaySpending>; today: string }) {
   const [hover, setHover] = useState<{ date: string; x: number; y: number } | null>(null);
+  // A click pins a day's card, so the pointer can reach its lines (to edit them).
+  const [pinned, setPinned] = useState<{ date: string; x: number; y: number } | null>(null);
+  const card = pinned ?? hover;
   const first = new Date(year, 0, 1);
   const offset = (first.getDay() + 6) % 7; // Monday first
   const total = new Date(year, 1, 29).getDate() === 29 ? 366 : 365;
@@ -592,22 +605,26 @@ export function SpendingCalendar({ year, days, today }: { year: number; days: Re
                 width={CELL}
                 height={CELL}
                 fill={future ? "transparent" : COLORS[level(day?.amount ?? 0)]}
-                stroke={hover?.date === date ? "#fff" : future ? "rgba(255,255,255,0.06)" : "none"}
+                stroke={card?.date === date ? "#fff" : future ? "rgba(255,255,255,0.06)" : "none"}
                 strokeWidth={2}
+                className={day ? "cursor-pointer" : ""}
                 onPointerEnter={() => setHover({ date, x: 40 + week * (CELL + GAP), y: 22 + weekday * (CELL + GAP) })}
+                onClick={() => (day ? setPinned(pinned?.date === date ? null : { date, x: 40 + week * (CELL + GAP), y: 22 + weekday * (CELL + GAP) }) : setPinned(null))}
               />
             );
           })}
         </svg>
-        {hover && (
+        {card && (
           <LinesCard
-            title={localDate(hover.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" })}
-            total={days[hover.date]?.amount ?? 0}
-            lines={days[hover.date]?.lines ?? []}
-            max={6}
+            title={localDate(card.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" })}
+            total={days[card.date]?.amount ?? 0}
+            lines={days[card.date]?.lines ?? []}
+            max={pinned ? 20 : 6}
             showDate={false}
+            interactive={!!pinned}
+            onClose={pinned ? () => setPinned(null) : undefined}
             className="w-64"
-            style={{ left: `${((hover.x + CELL) / WIDTH) * 100}%`, top: `${(hover.y / HEIGHT) * 100}%`, transform: hover.x / WIDTH > 0.7 ? "translate(calc(-100% - 24px), -50%)" : "translate(8px, -50%)" }}
+            style={{ left: `${((card.x + CELL) / WIDTH) * 100}%`, top: `${(card.y / HEIGHT) * 100}%`, transform: card.x / WIDTH > 0.7 ? "translate(calc(-100% - 24px), -50%)" : "translate(8px, -50%)" }}
           />
         )}
       </div>
@@ -629,6 +646,74 @@ export function SpendingCalendar({ year, days, today }: { year: number; days: Re
           plus
         </span>
       </div>
+    </div>
+  );
+}
+
+const FIRST_LABELS = 6;
+
+/** Where a category's money went: the biggest labels first, the rest on demand, a search when there are many. */
+function WhereItGoes({ top }: { top: CategoryYear["top"] }) {
+  const [hover, setHover] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
+  const [query, setQuery] = useState("");
+  const words = query.trim().toUpperCase();
+  const matching = words ? top.filter((t) => t.label.includes(words)) : top;
+  const shown = all || words ? matching : matching.slice(0, FIRST_LABELS);
+  const rest = matching.slice(FIRST_LABELS);
+  const max = top[0]?.total || 1;
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+          Où ça part · {top.length} libellé{top.length > 1 ? "s" : ""}
+        </p>
+        {top.length > FIRST_LABELS * 2 && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Chercher…"
+            aria-label="Chercher un libellé"
+            className="w-36 !border-2 !py-1 !text-xs uppercase"
+          />
+        )}
+      </div>
+      <ul className="grid gap-1" onPointerLeave={() => setHover(null)}>
+        {shown.map((t) => (
+          <li
+            key={t.label}
+            tabIndex={0}
+            onPointerEnter={() => setHover(t.label)}
+            onFocus={() => setHover(t.label)}
+            onBlur={() => setHover(null)}
+            className={`relative -mx-2 grid gap-1 px-2 py-1 outline-none transition ${hover === t.label ? "bg-zinc-100" : ""}`}
+          >
+            <span className="flex justify-between gap-3 text-sm font-bold">
+              <span className="truncate">{t.label}</span>
+              <span className="shrink-0">
+                {formatMoney(t.total)} <span className="font-semibold text-zinc-500">· {t.count}×</span>
+              </span>
+            </span>
+            <span className="h-1.5 bg-zinc-200">
+              <span className="block h-full transition-colors" style={{ width: `${(t.total / max) * 100}%`, background: hover === t.label ? "var(--mn-accent)" : "var(--mn-ink)" }} />
+            </span>
+            {hover === t.label && (
+              <LinesCard title={`${t.label} · ${t.count} passage${t.count > 1 ? "s" : ""}`} total={t.total} lines={t.lines} max={30} showLabel={false} className="bottom-full left-0 right-0 mb-1" />
+            )}
+          </li>
+        ))}
+        {words && matching.length === 0 && <li className="py-2 text-sm text-zinc-500">Aucun libellé ne correspond.</li>}
+      </ul>
+      {!words && rest.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setAll(!all)}
+          className="mt-2 flex w-full items-center justify-between gap-3 border-2 border-dashed border-zinc-300 px-3 py-2 text-sm font-bold text-zinc-600 transition hover:border-[var(--mn-ink)] hover:text-[var(--mn-ink)]"
+        >
+          <span>{all ? "▲ Réduire" : `▼ ${rest.length} autre${rest.length > 1 ? "s" : ""} libellé${rest.length > 1 ? "s" : ""}`}</span>
+          {!all && <span>{formatMoney(rest.reduce((n, t) => n + t.total, 0))}</span>}
+        </button>
+      )}
     </div>
   );
 }
