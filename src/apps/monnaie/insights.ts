@@ -119,6 +119,9 @@ export function categoryAverages(ledger: Ledger, month: string, kind: "expense" 
   return totals;
 }
 
+/** One line, as the hover cards of the year page show it. */
+export type LineDetail = { date: string; label: string; amount: Cents; emoji?: string };
+
 /** One category over a year: total, month by month, and where the money went (top labels). */
 export type CategoryYear = {
   category: Category;
@@ -126,39 +129,53 @@ export type CategoryYear = {
   count: number;
   /** Index 0 = January. */
   months: Cents[];
-  top: { label: string; total: Cents; count: number }[];
+  /** Every line of the year, oldest first. */
+  lines: LineDetail[];
+  top: { label: string; total: Cents; count: number; lines: LineDetail[] }[];
 };
 
 export function categoryYear(ledger: Ledger, year: number, kind: "expense" | "charge"): CategoryYear[] {
   const categories = categoriesOf(ledger);
-  const byId = new Map<string, CategoryYear & { labels: Map<string, { total: Cents; count: number }> }>();
+  const byId = new Map<string, CategoryYear & { labels: Map<string, { total: Cents; count: number; lines: LineDetail[] }> }>();
   for (const e of ledger.entries) {
     if (e.kind !== kind || !e.date.startsWith(`${year}-`)) continue;
     const category = getCategory(kind, e.category, categories);
-    const row = byId.get(category.id) ?? { category, total: 0, count: 0, months: Array.from({ length: 12 }, () => 0), top: [], labels: new Map() };
+    const row = byId.get(category.id) ?? { category, total: 0, count: 0, months: Array.from({ length: 12 }, () => 0), lines: [] as LineDetail[], top: [], labels: new Map() };
+    const line = { date: e.date, label: e.label, amount: e.amount };
     row.total += e.amount;
     row.count++;
     row.months[Number(e.date.slice(5, 7)) - 1] += e.amount;
+    row.lines.push(line);
     const key = normalizeBankLabel(e.label);
-    const label = row.labels.get(key) ?? { total: 0, count: 0 };
-    row.labels.set(key, { total: label.total + e.amount, count: label.count + 1 });
+    const label = row.labels.get(key) ?? { total: 0, count: 0, lines: [] };
+    row.labels.set(key, { total: label.total + e.amount, count: label.count + 1, lines: [...label.lines, line] });
     byId.set(category.id, row);
   }
   return [...byId.values()]
     .map(({ labels, ...row }) => ({
       ...row,
-      top: [...labels].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.total - a.total).slice(0, 6),
+      lines: row.lines.sort(byDate),
+      top: [...labels]
+        .map(([label, v]) => ({ label, ...v, lines: v.lines.sort(byDate) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 6),
     }))
     .sort((a, b) => b.total - a.total);
 }
 
-/** Plaisir spent each day of a year ("YYYY-MM-DD" -> amount and number of lines). */
-export function dailySpending(ledger: Ledger, year: number): Record<string, { amount: Cents; count: number }> {
-  const days: Record<string, { amount: Cents; count: number }> = {};
+const byDate = (a: LineDetail, b: LineDetail) => a.date.localeCompare(b.date);
+
+export type DaySpending = { amount: Cents; count: number; lines: LineDetail[] };
+
+/** Plaisir spent each day of a year ("YYYY-MM-DD" -> amount and the lines, biggest first). */
+export function dailySpending(ledger: Ledger, year: number): Record<string, DaySpending> {
+  const categories = categoriesOf(ledger);
+  const days: Record<string, DaySpending> = {};
   for (const e of ledger.entries) {
     if (e.kind !== "expense" || !e.date.startsWith(`${year}-`)) continue;
-    const day = days[e.date] ?? { amount: 0, count: 0 };
-    days[e.date] = { amount: day.amount + e.amount, count: day.count + 1 };
+    const day = days[e.date] ?? { amount: 0, count: 0, lines: [] };
+    const line = { date: e.date, label: e.label, amount: e.amount, emoji: getCategory(e.kind, e.category, categories).emoji };
+    days[e.date] = { amount: day.amount + e.amount, count: day.count + 1, lines: [...day.lines, line].sort((a, b) => b.amount - a.amount) };
   }
   return days;
 }

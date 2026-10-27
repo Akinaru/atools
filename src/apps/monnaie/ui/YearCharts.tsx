@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type CSSProperties } from "react";
-import type { CategoryYear } from "../insights";
+import type { CategoryYear, DaySpending, LineDetail } from "../insights";
 import { formatMoney, formatSigned, monthName, monthShortName, type Cents } from "../money";
 import { openMonth } from "../server/actions";
 import { useBusy } from "./motion";
@@ -24,6 +24,42 @@ type SeriesKey = (typeof SERIES)[number]["key"];
 const short = (month: string) => monthShortName(month).replace(".", "");
 /** "2026-10-27" as a local date (new Date("2026-10-27") would be UTC midnight). */
 const localDate = (date: string) => new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8)));
+
+const dayMonth = (date: string) => localDate(date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+/**
+ * Hover card listing lines with their dates: the detail behind a bar or a day. Without labels (one label's
+ * visits), the dates flow in three columns so that a frequent place still fits.
+ */
+function LinesCard({ title, total, lines, max = 8, showLabel = true, showDate = true, className = "w-64", style }: { title: string; total: Cents; lines: LineDetail[]; max?: number; showLabel?: boolean; showDate?: boolean; className?: string; style?: CSSProperties }) {
+  return (
+    <div className={`pointer-events-none absolute z-30 border-[3px] border-[var(--mn-ink)] bg-white p-3 text-[var(--mn-ink)] shadow-[4px_4px_0_var(--mn-ink)] ${className}`} style={style}>
+      <div className="flex items-baseline justify-between gap-3 border-b-2 border-dashed border-zinc-200 pb-1.5">
+        <span className="mn-punch truncate text-base capitalize">{title}</span>
+        <span className="mn-punch shrink-0 text-base text-[var(--mn-accent)]">{formatMoney(total)}</span>
+      </div>
+      {lines.length ? (
+        <ul className={`mt-1.5 grid gap-x-4 gap-y-1 text-[13px] ${showLabel ? "" : "grid-cols-3"}`}>
+          {lines.slice(0, max).map((l, i) => (
+            <li key={i} className="flex items-baseline gap-2">
+              {showDate && <span className="w-12 shrink-0 font-bold text-zinc-500">{dayMonth(l.date)}</span>}
+              {showLabel && (
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  {l.emoji && <span className="mr-1">{l.emoji}</span>}
+                  {l.label}
+                </span>
+              )}
+              <span className={`shrink-0 font-bold ${showLabel ? "" : "ml-auto"}`}>{formatMoney(l.amount)}</span>
+            </li>
+          ))}
+          {lines.length > max && <li className="col-span-full pt-0.5 text-xs font-semibold text-zinc-500">+ {lines.length - max} autre{lines.length - max > 1 ? "s" : ""}</li>}
+        </ul>
+      ) : (
+        <p className="mt-1.5 text-[13px] font-semibold text-zinc-500">rien cramé 🙌</p>
+      )}
+    </div>
+  );
+}
 
 /** Toggle chip of a series, in the app's style. */
 function Chip({ on, color, label, onClick, dashed = false }: { on: boolean; color: string; label: string; onClick: () => void; dashed?: boolean }) {
@@ -184,6 +220,7 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = list.find((c) => c.category.id === selectedId) ?? list[0];
   const [hover, setHover] = useState<number | null>(null);
+  const [hoverTop, setHoverTop] = useState<string | null>(null);
   const total = list.reduce((n, c) => n + c.total, 0) || 1;
 
   const stats = useMemo(() => {
@@ -284,9 +321,12 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
                         style={{ height: `${(v / (stats.max || 1)) * 100}%`, background: hover === i ? "var(--mn-ink)" : "var(--mn-accent)", animationDelay: `${i * 30}ms` } as CSSProperties}
                       />
                       {hover === i && (
-                        <span className="mn-punch absolute -top-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap bg-[var(--mn-ink)] px-2 pt-1 text-xs text-white">
-                          {formatMoney(v)}
-                        </span>
+                        <LinesCard
+                          title={monthName(`${year}-${String(i + 1).padStart(2, "0")}`)}
+                          total={v}
+                          lines={selected.lines.filter((l) => Number(l.date.slice(5, 7)) === i + 1)}
+                          className={`bottom-full mb-2 w-64 ${i < 3 ? "left-0" : i > 8 ? "right-0" : "left-1/2 -translate-x-1/2"}`}
+                        />
                       )}
                     </div>
                   ))}
@@ -302,9 +342,16 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
 
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">Où ça part</p>
-                <ul className="grid gap-2">
+                <ul className="grid gap-1" onPointerLeave={() => setHoverTop(null)}>
                   {selected.top.map((t) => (
-                    <li key={t.label} className="grid gap-1">
+                    <li
+                      key={t.label}
+                      tabIndex={0}
+                      onPointerEnter={() => setHoverTop(t.label)}
+                      onFocus={() => setHoverTop(t.label)}
+                      onBlur={() => setHoverTop(null)}
+                      className={`relative -mx-2 grid gap-1 px-2 py-1 outline-none transition ${hoverTop === t.label ? "bg-zinc-100" : ""}`}
+                    >
                       <span className="flex justify-between gap-3 text-sm font-bold">
                         <span className="truncate">{t.label}</span>
                         <span className="shrink-0">
@@ -312,8 +359,11 @@ export function CategoryExplorer({ expense, charge, year }: { expense: CategoryY
                         </span>
                       </span>
                       <span className="h-1.5 bg-zinc-200">
-                        <span className="block h-full bg-[var(--mn-ink)]" style={{ width: `${(t.total / selected.top[0].total) * 100}%` }} />
+                        <span className="block h-full transition-colors" style={{ width: `${(t.total / selected.top[0].total) * 100}%`, background: hoverTop === t.label ? "var(--mn-accent)" : "var(--mn-ink)" }} />
                       </span>
+                      {hoverTop === t.label && (
+                        <LinesCard title={`${t.label} · ${t.count} passage${t.count > 1 ? "s" : ""}`} total={t.total} lines={t.lines} max={30} showLabel={false} className="bottom-full left-0 right-0 mb-1" />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -336,7 +386,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 /** Plaisir spent day by day over the year, GitHub style: the darker, the more; hover a day to read it. */
-export function SpendingCalendar({ year, days, today }: { year: number; days: Record<string, { amount: Cents; count: number }>; today: string }) {
+export function SpendingCalendar({ year, days, today }: { year: number; days: Record<string, DaySpending>; today: string }) {
   const [hover, setHover] = useState<{ date: string; x: number; y: number } | null>(null);
   const first = new Date(year, 0, 1);
   const offset = (first.getDay() + 6) % 7; // Monday first
@@ -399,14 +449,15 @@ export function SpendingCalendar({ year, days, today }: { year: number; days: Re
           })}
         </svg>
         {hover && (
-          <div
-            className="pointer-events-none absolute z-10 whitespace-nowrap border-[3px] border-[var(--mn-ink)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--mn-ink)] shadow-[3px_3px_0_var(--mn-ink)]"
+          <LinesCard
+            title={localDate(hover.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" })}
+            total={days[hover.date]?.amount ?? 0}
+            lines={days[hover.date]?.lines ?? []}
+            max={6}
+            showDate={false}
+            className="w-64"
             style={{ left: `${((hover.x + CELL) / WIDTH) * 100}%`, top: `${(hover.y / HEIGHT) * 100}%`, transform: hover.x / WIDTH > 0.7 ? "translate(calc(-100% - 24px), -50%)" : "translate(8px, -50%)" }}
-          >
-            <span className="mn-punch capitalize">{localDate(hover.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" })}</span>
-            {" · "}
-            {days[hover.date] ? `${formatMoney(days[hover.date].amount)} (${days[hover.date].count} achat${days[hover.date].count > 1 ? "s" : ""})` : "rien cramé 🙌"}
-          </div>
+          />
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--mn-muted)]">
