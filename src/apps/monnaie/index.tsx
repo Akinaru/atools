@@ -8,7 +8,6 @@ import { readLedger } from "./server/store";
 import { VIEW_COOKIES } from "./server/view";
 import { GoalsView } from "./ui/GoalsView";
 import { ImportView } from "./ui/ImportView";
-import { OperationsView } from "./ui/OperationsView";
 import { MonthView } from "./ui/MonthView";
 import { SettingsView } from "./ui/SettingsView";
 import { YearView } from "./ui/YearView";
@@ -30,7 +29,6 @@ async function Page({ path }: { path: string[] }) {
   if (section === "objectifs") return <GoalsView ledger={ledger} />;
   if (section === "reglages") return <SettingsView ledger={ledger} today={today} />;
   if (section === "import") return <ImportView />;
-  if (section === "operations") return <OperationsView ledger={ledger} />;
   notFound();
 }
 

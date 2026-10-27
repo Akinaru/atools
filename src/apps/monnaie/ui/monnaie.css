@@ -340,6 +340,17 @@
   animation: mn-route-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
+/* Chart bars grow from their base. */
+@keyframes mn-bar {
+  from { transform: scaleY(0); }
+}
+
+.mn-bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: mn-bar 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
 /* Deleted line: folds and flies away before the server even answers. */
 @keyframes mn-row-out {
   to { opacity: 0; transform: translateX(3rem) rotate(4deg) scale(0.92); }
@@ -361,7 +372,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mn-drop, .mn-grow, .mn-slam, .mn-draw, .mn-route, .mn-pop, .mn-pending, .mn-link-pending, .mn-boil::before, .mn-btn::before { animation: none; }
+  .mn-drop, .mn-grow, .mn-slam, .mn-draw, .mn-bar, .mn-route, .mn-pop, .mn-pending, .mn-link-pending, .mn-boil::before, .mn-btn::before { animation: none; }
 }
 
 /* --- Forms --- */

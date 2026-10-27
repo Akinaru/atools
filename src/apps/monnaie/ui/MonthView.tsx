@@ -21,7 +21,7 @@ import { addRecurringToMonth, showMonth } from "../server/actions";
 import { CategoryBars } from "./charts";
 import { MonthCompareChart } from "./MonthCompareChart";
 import { EntryDialog } from "./EntryDialog";
-import { OperationsClient } from "./OperationsClient";
+import { JournalBrowser } from "./JournalBrowser";
 import { ActionButton, AnimatedMoney } from "./motion";
 import { ViewNav } from "./ViewNav";
 import { BASE, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, Stamp, Tag } from "./kit";
@@ -281,7 +281,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
       <Panel className="mt-6 scroll-mt-6" id="journal">
         <PanelTitle aside={<Tag>{stats.entries.length} lignes</Tag>}>Le journal du mois</PanelTitle>
         {stats.entries.length ? (
-          <OperationsClient entries={stats.entries} categories={categories} labelCounts={labelCounts} periods={false} embedded />
+          <JournalBrowser entries={stats.entries} categories={categories} labelCounts={labelCounts} />
         ) : (
           <div className="flex flex-col items-center gap-6 py-12 text-center">
             <Slab tilt={-3} className="text-4xl">

@@ -174,7 +174,7 @@ Suivi de l'argent : ce que je gagne, mes charges (loyer, énergie, assurances…
 | `import/` | Lecture des exports bancaires et suggestions de catégorie |
 | `ui/` | Écrans : mois, année, objectifs, import, réglages ; DA dans `ui/monnaie.css` |
 
-- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/operations` (recherche et filtres), `/annee/AAAA`, `/objectifs`, `/import`, `/reglages`.
+- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/annee/AAAA`, `/objectifs`, `/import`, `/reglages`.
 - **Import bancaire** (`import/`) : `caisse-epargne.ts` lit l'export CSV, `suggest.ts` propose type et catégorie (règles apprises, puis catégories de la banque). Chaque opération a un `importId` stable : réimporter une période ne crée pas de doublon. Corriger une ligne à l'import crée une règle (gérées dans les Réglages).
 - **Épargne** : le livret, avec son solde de départ dans les Réglages. Revolut est traité comme une dépense ou un revenu (catégorie « Revolut »).
 - **Analyses** (`insights.ts`) : ce qui revient chaque mois (même libellé, 3 mois sur 6, montant stable), prévision du solde au 31, moyenne de chaque catégorie sur les 3 mois précédents.

@@ -118,3 +118,47 @@ export function categoryAverages(ledger: Ledger, month: string, kind: "expense" 
   for (const [id, total] of totals) totals.set(id, Math.round(total / previous.length));
   return totals;
 }
+
+/** One category over a year: total, month by month, and where the money went (top labels). */
+export type CategoryYear = {
+  category: Category;
+  total: Cents;
+  count: number;
+  /** Index 0 = January. */
+  months: Cents[];
+  top: { label: string; total: Cents; count: number }[];
+};
+
+export function categoryYear(ledger: Ledger, year: number, kind: "expense" | "charge"): CategoryYear[] {
+  const categories = categoriesOf(ledger);
+  const byId = new Map<string, CategoryYear & { labels: Map<string, { total: Cents; count: number }> }>();
+  for (const e of ledger.entries) {
+    if (e.kind !== kind || !e.date.startsWith(`${year}-`)) continue;
+    const category = getCategory(kind, e.category, categories);
+    const row = byId.get(category.id) ?? { category, total: 0, count: 0, months: Array.from({ length: 12 }, () => 0), top: [], labels: new Map() };
+    row.total += e.amount;
+    row.count++;
+    row.months[Number(e.date.slice(5, 7)) - 1] += e.amount;
+    const key = normalizeBankLabel(e.label);
+    const label = row.labels.get(key) ?? { total: 0, count: 0 };
+    row.labels.set(key, { total: label.total + e.amount, count: label.count + 1 });
+    byId.set(category.id, row);
+  }
+  return [...byId.values()]
+    .map(({ labels, ...row }) => ({
+      ...row,
+      top: [...labels].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.total - a.total).slice(0, 6),
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Plaisir spent each day of a year ("YYYY-MM-DD" -> amount and number of lines). */
+export function dailySpending(ledger: Ledger, year: number): Record<string, { amount: Cents; count: number }> {
+  const days: Record<string, { amount: Cents; count: number }> = {};
+  for (const e of ledger.entries) {
+    if (e.kind !== "expense" || !e.date.startsWith(`${year}-`)) continue;
+    const day = days[e.date] ?? { amount: 0, count: 0 };
+    days[e.date] = { amount: day.amount + e.amount, count: day.count + 1 };
+  }
+  return days;
+}

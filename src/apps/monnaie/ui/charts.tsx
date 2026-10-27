@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { formatMoney, monthShortName, type Cents, type CategoryTotal, type MonthStats } from "../money";
+import { formatMoney, type Cents, type CategoryTotal } from "../money";
 
 /**
  * One row per category, the biggest in the accent color. Optional per-category `budgets` (a white marker, the bar turns
@@ -61,79 +61,5 @@ export function CategoryBars({
         );
       })}
     </ul>
-  );
-}
-
-/**
- * 12 months: income bar, and an outflow bar stacked with charges, plaisir and what was put aside.
- * The dotted line is the livret balance at the end of each month.
- */
-export function YearChart({ months, current }: { months: MonthStats[]; current?: string }) {
-  const W = 720;
-  const H = 260;
-  const outflow = (m: MonthStats) => m.charges + m.spent + Math.max(m.saved, 0);
-  const lastActive = months.findLastIndex((m) => m.entries.length > 0);
-  const balances = months.slice(0, lastActive + 1).map((m) => m.savingsBalance);
-  const top = Math.max(...months.flatMap((m) => [m.income, outflow(m)]), ...balances, 1);
-  const slot = W / 12;
-  const bar = slot * 0.3;
-  const y = (cents: number) => H - (Math.max(cents, 0) / top) * H;
-  const h = (cents: number) => (Math.max(cents, 0) / top) * H;
-  const line = balances.map((v, i) => `${i ? "L" : "M"}${(slot * i + slot / 2).toFixed(1)},${y(v).toFixed(1)}`).join("");
-  return (
-    <figure>
-      <svg viewBox={`0 0 ${W} ${H + 28}`} className="w-full overflow-visible" role="img" aria-label="Revenus, dépenses et livret par mois">
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line key={f} x1="0" x2={W} y1={H - H * f} y2={H - H * f} stroke="rgba(255,255,255,0.06)" />
-        ))}
-        {months.map((m, i) => {
-          const cx = slot * i + slot / 2;
-          // Stack from the bottom: charges, then plaisir, then livret.
-          const stack = [
-            { value: m.charges, fill: "var(--mn-muted)", label: "Charges" },
-            { value: m.spent, fill: "var(--mn-accent)", label: "Cramé" },
-            { value: Math.max(m.saved, 0), fill: "var(--mn-yellow)", label: "Livret" },
-          ];
-          let base = H;
-          return (
-            <g key={m.month}>
-              {m.month === current && <rect x={slot * i + 2} y="0" width={slot - 4} height={H} fill="rgba(255,255,255,0.04)" />}
-              <rect x={cx - bar - 2} y={y(m.income)} width={bar} height={h(m.income)} fill="#e8e8ee">
-                <title>{`Encaissé ${formatMoney(m.income)}`}</title>
-              </rect>
-              {stack.map((part) => {
-                base -= h(part.value);
-                return (
-                  <rect key={part.label} x={cx + 2} y={base} width={bar} height={h(part.value)} fill={part.fill}>
-                    <title>{`${part.label} ${formatMoney(part.value)}`}</title>
-                  </rect>
-                );
-              })}
-              <text x={cx} y={H + 22} textAnchor="middle" fontSize="15" fill={m.month === current ? "#fff" : "#7b7c86"} fontWeight="700">
-                {monthShortName(m.month).replace(".", "")}
-              </text>
-            </g>
-          );
-        })}
-        {line && <path d={line} fill="none" stroke="var(--mn-yellow)" strokeWidth="3" strokeDasharray="2 7" strokeLinecap="round" />}
-      </svg>
-      <figcaption className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 bg-[#e8e8ee]" /> Encaissé
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 bg-[var(--mn-muted)]" /> Charges
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 bg-[var(--mn-accent)]" /> Cramé (plaisir)
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 bg-[var(--mn-yellow)]" /> Mis de côté
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-0 w-5 border-t-[3px] border-dotted border-[var(--mn-yellow)]" /> Solde du livret
-        </span>
-      </figcaption>
-    </figure>
   );
 }
