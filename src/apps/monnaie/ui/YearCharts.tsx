@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import type { CategoryYear, DaySpending, LineDetail } from "../insights";
-import { formatMoney, formatSigned, monthName, monthShortName, type Cents } from "../money";
+import { formatMoney, formatSigned, monthName, monthShortName, type AccountLevels, type Cents } from "../money";
 import { openMonth } from "../server/actions";
 import { useBusy } from "./motion";
 
@@ -210,6 +210,157 @@ export function YearFlowChart({ months, current }: { months: YearMonth[]; curren
         )}
       </div>
     </figure>
+  );
+}
+
+const ACCOUNT_COLORS = ["#e8e8ee", "var(--mn-yellow)", "#5ee08a", "#7cc4ff", "#c58cff", "#ff8fb8"];
+
+/**
+ * Level of each account at the end of every month of the year, and their total. `months` starts with the
+ * December before (the level at the start of the year); `levels` has one value per month of `months`.
+ */
+export function AccountLevelsChart({ months, levels }: { months: string[]; levels: AccountLevels[] }) {
+  const series = [
+    ...levels.map((l, i) => ({ ...l, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length], total: false })),
+    {
+      id: "total",
+      name: "Total",
+      emoji: "Σ",
+      type: "courant" as const,
+      color: "var(--mn-accent)",
+      total: true,
+      // Unknown as soon as one account is unknown.
+      values: months.map((_, i) => (levels.every((l) => l.values[i] !== null) ? levels.reduce((n, l) => n + (l.values[i] ?? 0), 0) : null)),
+    },
+  ];
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hover, setHover] = useState<number | null>(null);
+  const shown = series.filter((s) => !hidden.has(s.id));
+  const W = 960;
+  const H = 300;
+  const PAD = 84;
+  const slot = (W - PAD - 12) / 12;
+  const values = shown.flatMap((s) => s.values.slice(1).filter((v): v is number => v !== null));
+  const top = Math.max(1, ...values);
+  const bottom = Math.min(0, ...values);
+  const y = (v: number) => 10 + (1 - (v - bottom) / (top - bottom || 1)) * (H - 20);
+  const x = (i: number) => PAD + slot * i + slot / 2;
+  const toggle = (id: string) =>
+    setHidden((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next.size < series.length ? next : set;
+    });
+  const last = (s: (typeof series)[number]) => s.values.findLastIndex((v) => v !== null);
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Comptes affichés">
+        {series.map((s) => (
+          <Chip key={s.id} on={!hidden.has(s.id)} color={s.color} label={`${s.emoji} ${s.name}`} dashed={s.total} onClick={() => toggle(s.id)} />
+        ))}
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H + 30}`} className="w-full overflow-visible" role="img" aria-label="Niveau des comptes à la fin de chaque mois" onPointerLeave={() => setHover(null)}>
+          {[0, 0.25, 0.5, 0.75, 1].map((f) => {
+            const v = Math.round(bottom + (top - bottom) * f);
+            return (
+              <g key={f}>
+                <line x1={PAD} x2={W - 12} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,0.07)" />
+                <text x={PAD - 10} y={y(v) + 4} textAnchor="end" fontSize="12" fill="#7b7c86">
+                  {formatMoney(v)}
+                </text>
+              </g>
+            );
+          })}
+          {bottom < 0 && <line x1={PAD} x2={W - 12} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.3)" />}
+          {months.slice(1).map((m, i) => (
+            <g key={m} onPointerEnter={() => setHover(i + 1)}>
+              <rect x={PAD + slot * i} y={0} width={slot} height={H} fill={hover === i + 1 ? "rgba(255,255,255,0.06)" : "transparent"} />
+              <text x={x(i)} y={H + 22} textAnchor="middle" fontSize="14" fontWeight="700" fill={series[0].values[i + 1] === null ? "#4a4c5c" : "#9a9cab"}>
+                {short(m)}
+              </text>
+            </g>
+          ))}
+          {shown.map((s) => {
+            const points = s.values.slice(1).flatMap((v, i) => (v === null ? [] : [[x(i), y(v)] as const]));
+            return (
+              <g key={`${s.id}-${hidden.size}`} pointerEvents="none">
+                <path
+                  d={points.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`).join("")}
+                  pathLength={1}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={s.total ? 3 : 3.5}
+                  strokeDasharray={s.total ? "2 7" : undefined}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={s.total ? "" : "mn-draw"}
+                />
+                {points.map(([px, py], i) => (
+                  <circle key={i} cx={px} cy={py} r={hover === i + 1 ? 6 : 3.5} fill={s.color} stroke="var(--mn-ink)" strokeWidth="2" />
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+
+        {hover !== null && (
+          <div
+            className="pointer-events-none absolute top-0 z-10 min-w-64 border-[3px] border-[var(--mn-ink)] bg-white px-3 py-2 text-sm text-[var(--mn-ink)] shadow-[4px_4px_0_var(--mn-ink)]"
+            style={{ left: `${(x(hover - 1) / W) * 100}%`, transform: hover > 8 ? "translateX(calc(-100% - 16px)) rotate(-1deg)" : "translateX(16px) rotate(1deg)" }}
+          >
+            <p className="mn-punch mb-1 text-base">Fin {monthName(months[hover])}</p>
+            {series.map((s) => {
+              const v = s.values[hover];
+              const before = s.values[hover - 1];
+              return (
+                <p key={s.id} className={`flex items-center justify-between gap-4 font-semibold ${hidden.has(s.id) ? "opacity-45" : ""} ${s.total ? "mt-1 border-t-2 border-dashed border-zinc-200 pt-1" : ""}`}>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 border border-[var(--mn-ink)]" style={{ background: s.color }} />
+                    {s.name}
+                  </span>
+                  <span className="text-right">
+                    {v === null ? "—" : formatMoney(v)}
+                    {v !== null && before !== null && v !== before && (
+                      <span className={`ml-2 text-xs ${v > before ? "text-emerald-600" : "text-[var(--mn-red)]"}`}>{formatSigned(v - before)}</span>
+                    )}
+                  </span>
+                </p>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* The year of each account: from the start of the year to its last known month. */}
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {series.map((s) => {
+          const end = last(s);
+          const start = s.values[0];
+          const value = end >= 0 ? s.values[end] : null;
+          return (
+            <li key={s.id} className="mn-shape grid gap-1 px-4 py-3" style={{ "--mn-shape": s.total ? "var(--mn-ink)" : "var(--mn-panel-2)" } as CSSProperties}>
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--mn-muted)]">
+                <span className="h-2.5 w-2.5" style={{ background: s.color }} aria-hidden />
+                {s.emoji} {s.name}
+              </span>
+              <span className="mn-punch text-2xl">{value === null ? "—" : formatMoney(value)}</span>
+              <span className="text-sm text-[var(--mn-muted)]">
+                {value !== null && start !== null ? (
+                  <>
+                    <b className={value >= start ? "text-emerald-400" : "text-[var(--mn-red)]"}>{formatSigned(value - start)}</b> depuis janvier
+                  </>
+                ) : (
+                  "pas de niveau connu en début d'année"
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

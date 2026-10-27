@@ -2,16 +2,17 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { isTyping, playSound } from "@/components/console/sound";
-import { amountInput, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
+import { amountInput, MAIN_ACCOUNT, type AccountNames, type Categories, type Entry, type Kind } from "../money";
 
-const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Épargne…", debt: "Dette…" };
-const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Épargne", debt: "Dette", income: "Revenu" };
+const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Épargne…", debt: "Dette…", transfer: "Virement…" };
+const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Épargne", debt: "Dette", income: "Revenu", transfer: "Virement" };
 const PLACEHOLDERS: Record<Kind, string> = {
   expense: "Burger du vendredi",
   charge: "Loyer d'octobre",
   income: "Salaire d'octobre",
   savings: "Virement livret A",
   debt: "Place de concert",
+  transfer: "Vers Revolut",
 };
 import { saveEntry } from "../server/actions";
 import { buttonClass, squareClass } from "./kit";
@@ -29,15 +30,15 @@ export function EntryDialog({
   hotkey = false,
   people = [],
   categories,
-  accounts = [],
+  names = { accounts: [MAIN_ACCOUNT], livrets: [] },
   sameLabel = 0,
 }: {
   /** Lines with the same label (this one included): offers to reclassify them all. */
   sameLabel?: number;
   /** Built-in and user categories (categoriesOf(ledger)). */
   categories: Categories;
-  /** The livrets, to pick one for a savings line. */
-  accounts?: SavingsAccount[];
+  /** The accounts and livrets, to pick where the money moved. */
+  names?: AccountNames;
   defaultDate: string;
   entry?: Entry;
   trigger?: ReactNode;
@@ -95,7 +96,7 @@ export function EntryDialog({
               </button>
             </div>
 
-            <fieldset className="grid grid-cols-5 border-[3px] border-[var(--mn-ink)]">
+            <fieldset className="grid grid-cols-3 border-[3px] border-[var(--mn-ink)] sm:grid-cols-6">
               <legend className="sr-only">Type</legend>
               {(Object.keys(TABS) as Kind[]).map((k) => (
                 <label key={k} className={`mn-punch cursor-pointer px-1 py-3 text-center text-sm sm:text-base ${kind === k ? "bg-[var(--mn-ink)] text-[var(--mn-accent)]" : ""}`}>
@@ -128,7 +129,8 @@ export function EntryDialog({
               </label>
             )}
 
-            <fieldset className="grid gap-2">
+            {kind === "transfer" && <input type="hidden" name="category" value="virement" />}
+            <fieldset className={`grid gap-2 ${kind === "transfer" ? "hidden" : ""}`} disabled={kind === "transfer"}>
               <legend className={`${labelClass} mb-1.5`}>Catégorie</legend>
               <div className="flex flex-wrap gap-2">
                 {categories[kind].map((c, i) => (
@@ -149,20 +151,18 @@ export function EntryDialog({
               </div>
             </fieldset>
 
-            {kind === "savings" && accounts.length > 0 && (
-              <fieldset className="grid gap-2">
-                <legend className={`${labelClass} mb-1.5`}>Livret</legend>
-                <div className="flex flex-wrap gap-2">
-                  {accounts.map((a, i) => (
-                    <label key={a.id} className="cursor-pointer">
-                      <input type="radio" name="account" value={a.id} defaultChecked={entry?.account ? entry.account === a.id : i === 0} className="peer sr-only" />
-                      <span className="inline-block border-2 border-[var(--mn-ink)] px-3 py-1.5 text-sm font-bold transition peer-checked:-rotate-2 peer-checked:bg-[var(--mn-yellow)] peer-checked:shadow-[3px_3px_0_var(--mn-ink)] peer-focus-visible:outline peer-focus-visible:outline-2">
-                        {a.emoji} {a.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+            {kind === "savings" && names.livrets.length > 0 && (
+              <Chips legend="Livret" name="livret" color="var(--mn-yellow)" options={names.livrets} defaultValue={entry?.livret ?? names.livrets[0].id} />
+            )}
+            {kind === "transfer" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Chips legend="De" name="account" color="#7cc4ff" options={names.accounts} defaultValue={entry?.account ?? MAIN_ACCOUNT.id} />
+                <Chips legend="Vers" name="to" color="#7cc4ff" options={names.accounts} defaultValue={entry?.to ?? names.accounts[1]?.id ?? MAIN_ACCOUNT.id} />
+              </div>
+            ) : (
+              names.accounts.length > 1 && (
+                <Chips legend="Compte" name="account" color="var(--mn-accent)" options={names.accounts} defaultValue={entry?.account ?? MAIN_ACCOUNT.id} />
+              )
             )}
 
             <div className="grid grid-cols-[auto_1fr] gap-3">
@@ -202,5 +202,27 @@ export function EntryDialog({
         </div>
       </dialog>
     </>
+  );
+}
+
+/** One-choice chips (account, livret) sent as `name` with the form. */
+function Chips({ legend, name, color, options, defaultValue }: { legend: string; name: string; color: string; options: { id: string; name: string; emoji: string }[]; defaultValue: string }) {
+  return (
+    <fieldset className="grid gap-2">
+      <legend className={`${labelClass} mb-1.5`}>{legend}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <label key={o.id} className="cursor-pointer">
+            <input type="radio" name={name} value={o.id} defaultChecked={o.id === defaultValue} className="peer sr-only" />
+            <span
+              className="inline-block border-2 border-[var(--mn-ink)] px-3 py-1.5 text-sm font-bold transition peer-checked:-rotate-2 peer-checked:bg-[var(--chip)] peer-checked:shadow-[3px_3px_0_var(--mn-ink)] peer-focus-visible:outline peer-focus-visible:outline-2"
+              style={{ "--chip": color } as React.CSSProperties}
+            >
+              {o.emoji} {o.name}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { isTyping, playSound } from "@/components/console/sound";
-import { CUSTOMIZABLE_KINDS, formatSigned, getCategory, lineCategoryLabel, monthName, monthShortName, signedAmount, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
+import { accountOf, CUSTOMIZABLE_KINDS, formatMoney, formatSigned, getCategory, lineCategoryLabel, monthName, monthShortName, signedAmount, type AccountNames, type Categories, type Entry, type Kind } from "../money";
 import { deleteLines, editLines } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { buttonClass } from "./kit";
@@ -18,6 +18,7 @@ const AMOUNT: Record<Kind, string> = {
   income: "text-white",
   savings: "text-[var(--mn-yellow)]",
   debt: "text-[var(--mn-red)]",
+  transfer: "text-[#7cc4ff]",
 };
 
 const shortDate = (date: string) => `${Number(date.slice(8))} ${monthShortName(date.slice(0, 7)).replace(".", "")} ${date.slice(2, 4)}`;
@@ -28,10 +29,11 @@ type Group = { label: string; ids: string[]; total: number; last: string; emojis
  * Every line of the ledger: search, filter, sort, then select (click, shift-click for a range, ⌘A for all) and act
  * on the selection: rename, reclassify, regret, delete. "Libellés" groups lines by name to rename one everywhere.
  */
-export function LinesBrowser({ entries, categories, accounts }: { entries: Entry[]; categories: Categories; accounts: SavingsAccount[] }) {
+export function LinesBrowser({ entries, categories, names }: { entries: Entry[]; categories: Categories; names: AccountNames }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [period, setPeriod] = useState("");
+  const [account, setAccount] = useState("");
   const [sort, setSort] = useState<"date" | "amount" | "label">("date");
   const [view, setView] = useState<"lines" | "labels">("lines");
   const [limit, setLimit] = useState(PAGE);
@@ -47,13 +49,14 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
     const list = entries.filter((e) => {
       if (category && `${e.kind}:${e.category}` !== category) return false;
       if (period && !e.date.startsWith(period)) return false;
+      if (account && accountOf(e) !== account && e.to !== account) return false;
       const haystack = `${e.label} ${e.note} ${e.person ?? ""}`.toLocaleUpperCase("fr-FR");
       return words.every((w) => haystack.includes(w));
     });
     if (sort === "amount") return [...list].sort((a, b) => b.amount - a.amount);
     if (sort === "label") return [...list].sort((a, b) => a.label.localeCompare(b.label) || b.date.localeCompare(a.date));
     return list;
-  }, [entries, query, category, period, sort]);
+  }, [entries, query, category, period, account, sort]);
 
   const groups = useMemo(() => {
     const byLabel = new Map<string, Group>();
@@ -87,7 +90,7 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
 
   const selection = entries.filter((e) => selected.has(e.id));
   const sum = (list: Entry[]) => list.reduce((n, e) => n + signedAmount(e), 0);
-  const filtered = query !== "" || category !== "" || period !== "";
+  const filtered = query !== "" || category !== "" || period !== "" || account !== "";
   const resetPage = () => setLimit(PAGE);
 
   const toggle = (ids: string[], on: boolean) =>
@@ -153,6 +156,15 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
           onChange={(v) => (setPeriod(v), resetPage())}
           options={[{ value: "", label: "Depuis toujours", emoji: "∞" }, ...periodOptions]}
         />
+        {names.accounts.length > 1 && (
+          <Picker
+            ariaLabel="Compte"
+            className="min-w-48 flex-1"
+            value={account}
+            onChange={(v) => (setAccount(v), resetPage())}
+            options={[{ value: "", label: "Tous les comptes", emoji: "🏦" }, ...names.accounts.map((a) => ({ value: a.id, label: a.name, emoji: a.emoji }))]}
+          />
+        )}
         <Segmented
           label="Trier par"
           value={sort}
@@ -194,7 +206,7 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
         {filtered && (
           <button
             type="button"
-            onClick={() => (setQuery(""), setCategory(""), setPeriod(""), resetPage())}
+            onClick={() => (setQuery(""), setCategory(""), setPeriod(""), setAccount(""), resetPage())}
             className="ml-auto font-bold uppercase tracking-wider underline decoration-[var(--mn-accent)] decoration-2 underline-offset-4 hover:text-white"
           >
             Effacer les filtres
@@ -224,7 +236,7 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
                   </span>
                   <EntryDialog
                     categories={categories}
-                    accounts={accounts}
+                    names={names}
                     sameLabel={entries.filter((e) => e.label === entry.label).length}
                     defaultDate={entry.date}
                     entry={entry}
@@ -235,7 +247,7 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
                           {entry.regret && <span className="ml-2 text-xs text-[var(--mn-red)]">REGRET</span>}
                         </span>
                         <span className="block truncate text-xs text-[var(--mn-muted)] empty:hidden">
-                          <span className="sm:hidden">{shortDate(entry.date)} · {lineCategoryLabel(entry, categories, accounts)}</span>
+                          <span className="sm:hidden">{shortDate(entry.date)} · {lineCategoryLabel(entry, categories, names)}</span>
                           {(entry.note || entry.person) && <span className="max-sm:before:content-['_·_']">{[entry.person, entry.note].filter(Boolean).join(" · ")}</span>}
                         </span>
                       </span>
@@ -243,9 +255,9 @@ export function LinesBrowser({ entries, categories, accounts }: { entries: Entry
                   />
                   <span className="hidden items-center gap-2 truncate text-sm text-[var(--mn-muted)] sm:flex">
                     <span className="h-2.5 w-2.5 shrink-0 rotate-45" style={{ background: KIND_COLORS[entry.kind] }} aria-hidden />
-                    <span className="truncate">{lineCategoryLabel(entry, categories, accounts)}</span>
+                    <span className="truncate">{lineCategoryLabel(entry, categories, names)}</span>
                   </span>
-                  <span className={`mn-punch min-w-24 text-right text-xl ${AMOUNT[entry.kind]}`}>{formatSigned(signedAmount(entry))}</span>
+                  <span className={`mn-punch min-w-24 text-right text-xl ${AMOUNT[entry.kind]}`}>{entry.kind === "transfer" ? formatMoney(entry.amount) : formatSigned(signedAmount(entry))}</span>
                 </li>
               );
             })}

@@ -20,6 +20,7 @@ export const KIND_COLORS: Record<Kind, string> = {
   income: "#ffffff",
   savings: "var(--mn-yellow)",
   debt: "var(--mn-red)",
+  transfer: "#7cc4ff",
 };
 
 export const kindOptions = (kinds: readonly Kind[]): PickerOption[] => kinds.map((k) => ({ value: k, label: KIND_LABELS[k], color: KIND_COLORS[k] }));
@@ -27,7 +28,7 @@ export const categoryOptions = (categories: Category[]): PickerOption[] => categ
 
 /** Every category of every type, grouped by type; values are "kind:id" (ids repeat between types, e.g. "autre"). */
 export const allCategoryOptions = (categories: Categories): PickerOption[] =>
-  (["expense", "charge", "income", "savings", "debt"] as const).flatMap((kind) =>
+  (["expense", "charge", "income", "savings", "debt", "transfer"] as const).flatMap((kind) =>
     categories[kind].map((c) => ({ value: `${kind}:${c.id}`, label: c.label, emoji: c.emoji, group: KIND_LABELS[kind], color: KIND_COLORS[kind] })),
   );
 

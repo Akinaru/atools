@@ -1,18 +1,20 @@
 import type { CSSProperties } from "react";
 import { categoryYear, dailySpending, detectRecurring } from "../insights";
-import { formatMoney, formatSigned, KIND_LABELS, monthName, yearStats, type Ledger } from "../money";
+import { accountLevels, personalLedger, formatMoney, formatSigned, KIND_LABELS, monthName, yearStats, type Ledger } from "../money";
 import { showYear } from "../server/actions";
 import { Panel, PanelTitle, Paper, Screen, Stamp, Tag } from "./kit";
 import { AnimatedMoney } from "./motion";
 import { ViewNav } from "./ViewNav";
-import { CategoryExplorer, SpendingCalendar, YearFlowChart, type YearMonth } from "./YearCharts";
+import { AccountLevelsChart, CategoryExplorer, SpendingCalendar, YearFlowChart, type YearMonth } from "./YearCharts";
 
 /** Overview of a year: what was kept, the months, the categories, the days. `today` is YYYY-MM-DD. */
 export function YearView({ ledger, year, today }: { ledger: Ledger; year: number; today: string }) {
   const stats = yearStats(ledger, year);
   // Recurring lines as of the last month of the year with data (or this month for the current year).
   const refMonth = year === Number(today.slice(0, 4)) ? today.slice(0, 7) : `${year}-12`;
-  const recurring = detectRecurring(ledger, refMonth);
+  // Analyses of my own money: a business account is left out.
+  const mine = personalLedger(ledger);
+  const recurring = detectRecurring(mine, refMonth);
   const recurringOut = recurring.filter((r) => r.kind !== "income").reduce((n, r) => n + r.amount, 0);
   const active = stats.months.filter((m) => m.entries.length > 0);
   const bestKept = active.reduce<(typeof active)[number] | undefined>((b, m) => (!b || m.kept > b.kept ? m : b), undefined);
@@ -22,6 +24,8 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
   const averageKept = active.length ? Math.round(stats.kept / active.length) : 0;
   const overBudget = stats.months.filter((m) => m.budget && m.spent > m.budget).length;
   const savingsRate = stats.income > 0 ? Math.round((stats.saved / stats.income) * 100) : null;
+  // The December before, then the 12 months: the level at the start of the year, then at the end of each month.
+  const levelMonths = [`${year - 1}-12`, ...stats.months.map((m) => m.month)];
   const months: YearMonth[] = stats.months.map((m) => ({
     month: m.month,
     income: m.income,
@@ -105,13 +109,18 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
       </Panel>
 
       <Panel className="mt-6">
+        <PanelTitle aside={<Tag>niveau à la fin de chaque mois</Tag>}>Tes comptes</PanelTitle>
+        <AccountLevelsChart months={levelMonths} levels={accountLevels(ledger, levelMonths, today)} />
+      </Panel>
+
+      <Panel className="mt-6">
         <PanelTitle aside={<Tag>clique une catégorie</Tag>}>Les catégories</PanelTitle>
-        <CategoryExplorer expense={categoryYear(ledger, year, "expense")} charge={categoryYear(ledger, year, "charge")} year={year} />
+        <CategoryExplorer expense={categoryYear(mine, year, "expense")} charge={categoryYear(mine, year, "charge")} year={year} />
       </Panel>
 
       <Panel className="mt-6">
         <PanelTitle aside={<Tag>plaisir, jour par jour</Tag>}>Le calendrier</PanelTitle>
-        <SpendingCalendar year={year} days={dailySpending(ledger, year)} today={today} />
+        <SpendingCalendar year={year} days={dailySpending(mine, year)} today={today} />
       </Panel>
 
       {recurring.length > 0 && (

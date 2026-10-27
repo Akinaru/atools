@@ -12,6 +12,8 @@ import {
   addGoal,
   addSavingsAccount,
   deleteSavingsAccount,
+  addCurrentAccount,
+  deleteCurrentAccount,
   importSavingsOperations,
   bulkDeleteEntries,
   bulkEditEntries,
@@ -66,6 +68,8 @@ const entryFromForm = (formData: FormData) => ({
   regret: formData.get("regret") === "on",
   person: text(formData, "person"),
   account: text(formData, "account"),
+  to: text(formData, "to"),
+  livret: text(formData, "livret"),
 });
 
 export async function saveEntry(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -238,6 +242,19 @@ export async function commitImport(_prev: FormState, formData: FormData): Promis
 
 export async function createSavingsAccount(_prev: FormState, formData: FormData): Promise<FormState> {
   return attempt(() => addSavingsAccount({ name: text(formData, "name"), emoji: text(formData, "emoji") }), "Livret ajouté.");
+}
+
+export async function createCurrentAccount(_prev: FormState, formData: FormData): Promise<FormState> {
+  return attempt(
+    () => addCurrentAccount({ name: text(formData, "name"), emoji: text(formData, "emoji"), personal: formData.get("pro") !== "on" }),
+    "Compte ajouté.",
+  );
+}
+
+/** Offered only for an account without lines (the store refuses otherwise). */
+export async function removeCurrentAccount(id: string) {
+  await deleteCurrentAccount(id);
+  refresh();
 }
 
 export async function removeSavingsAccount(id: string) {

@@ -16,6 +16,8 @@ import {
   type CategoryTotal,
   type Ledger,
   savingsAccountBalances,
+  accountNamesOf,
+  personalLedger,
   monthOf,
 } from "../money";
 import { categoryAverages, forecast } from "../insights";
@@ -51,7 +53,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
   const people = [...new Set(ledger.entries.flatMap((e) => (e.person ? [e.person] : [])))].sort((a, b) => a.localeCompare(b));
   const year = month.slice(0, 4);
   const categories = categoriesOf(ledger);
-  const outlook = forecast(ledger, today);
+  const outlook = forecast(personalLedger(ledger), today);
   // The real balance: today for the current month, at the end of the month otherwise.
   const balance = isCurrent ? outlook.balance : stats.accountBalance;
   const lastCheck = checkpointChecks(ledger).at(-1);
@@ -82,7 +84,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             prevLabel="Mois précédent"
             nextLabel="Mois suivant"
           />
-          <EntryDialog categories={categories} accounts={ledger.savingsAccounts} defaultDate={defaultDate} hotkey people={people} />
+          <EntryDialog categories={categories} names={accountNamesOf(ledger)} defaultDate={defaultDate} hotkey people={people} />
         </>
       }
     >
@@ -251,7 +253,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
         <Panel>
           <PanelTitle aside={<Tag>vs ta moyenne</Tag>}>Catégories</PanelTitle>
           {stats.byCategory.length ? (
-            <CategoryBars totals={stats.byCategory} dark budgets={ledger.categoryBudgets} averages={categoryAverages(ledger, month, "expense")} />
+            <CategoryBars totals={stats.byCategory} dark budgets={ledger.categoryBudgets} averages={categoryAverages(personalLedger(ledger), month, "expense")} />
           ) : (
             <p className="text-zinc-500">Aucune dépense plaisir ce mois-ci.</p>
           )}
@@ -298,7 +300,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
       <Panel className="mt-6 scroll-mt-6" id="journal">
         <PanelTitle aside={<Tag>{stats.entries.length} lignes</Tag>}>Le journal du mois</PanelTitle>
         {stats.entries.length ? (
-          <JournalBrowser entries={stats.entries} categories={categories} accounts={ledger.savingsAccounts} labelCounts={labelCounts} />
+          <JournalBrowser entries={stats.entries} categories={categories} names={accountNamesOf(ledger)} labelCounts={labelCounts} />
         ) : (
           <div className="flex flex-col items-center gap-6 py-12 text-center">
             <Slab tilt={-3} className="text-4xl">

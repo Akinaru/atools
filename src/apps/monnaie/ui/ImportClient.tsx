@@ -15,6 +15,9 @@ type Draft = {
   category: string;
   label: string;
   person: string;
+  /** Transfer: the accounts, from the rule. */
+  account?: string;
+  to?: string;
   /** Learn a rule from this row (set as soon as the user changes something). */
   remember: boolean;
 };
@@ -29,6 +32,8 @@ const toDraft = (row: PreviewRow): Draft => ({
   category: row.suggestion.category,
   label: row.suggestion.label,
   person: row.suggestion.person ?? "",
+  account: row.suggestion.account,
+  to: row.suggestion.to,
   remember: false,
 });
 
@@ -124,6 +129,8 @@ function Review({ rows, alreadyImported, categories }: { rows: PreviewRow[]; alr
           category: d.category,
           label: d.label,
           person: d.person,
+          account: d.kind === "transfer" ? d.account : undefined,
+          to: d.kind === "transfer" ? d.to : undefined,
           amount: Math.abs(d.row.amount),
           date: d.row.date,
           bookedDate: d.row.bookedDate,
@@ -233,7 +240,8 @@ function ReviewRow({ draft: d, categories: all, onChange, tilt }: { draft: Draft
           value={d.kind}
           disabled={d.ignore}
           onChange={(v) => onChange({ kind: v as Kind, category: all[v as Kind][0].id })}
-          options={kindOptions(KINDS)}
+          // A transfer needs its two accounts: only offered when a rule gave them.
+          options={kindOptions(KINDS.filter((k) => k !== "transfer" || d.row.suggestion.kind === "transfer"))}
         />
         <Picker ariaLabel="Catégorie" size="sm" value={d.category} disabled={d.ignore} onChange={(v) => onChange({ category: v })} options={categoryOptions(categories)} />
         {d.kind === "debt" ? (

@@ -1,7 +1,7 @@
 // What a bank operation becomes in Monnaie: the user's rules first, then the bank's own categories.
 // Pure functions: shared by the import screen, the Server Actions and the API.
 
-import type { ImportRule, Kind } from "../money";
+import { MAIN_ACCOUNT, type ImportRule, type Kind } from "../money";
 import type { BankOperation } from "./caisse-epargne";
 
 export type Suggestion = {
@@ -10,6 +10,9 @@ export type Suggestion = {
   category: string;
   label: string;
   person?: string;
+  /** Transfer: the accounts it goes from and to. */
+  account?: string;
+  to?: string;
   /** Where it comes from: a learned rule, the bank categories, or nothing better. */
   source: "rule" | "bank" | "default";
 };
@@ -123,6 +126,11 @@ export function suggest(op: BankOperation, rules: ImportRule[]): Suggestion {
       let category = rule.category;
       if (rule.kind === "savings") category = out ? "depot" : "retrait";
       if (rule.kind === "debt" && (rule.category === "rembourse" || rule.category === "recu")) category = out ? "rembourse" : "recu";
+      // A transfer leaves the imported (main) account when the money goes out, and comes into it otherwise.
+      if (rule.kind === "transfer" && rule.account) {
+        const [account, to] = out ? [MAIN_ACCOUNT.id, rule.account] : [rule.account, MAIN_ACCOUNT.id];
+        return { ignore: false, kind: "transfer", category: "virement", label: rule.label || op.label, account, to, source: "rule" };
+      }
       return { ignore: false, kind: rule.kind, category, label: rule.label || op.label, person: rule.person, source: "rule" };
     }
   }

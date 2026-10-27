@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, savingsAccountBalances, type Ledger } from "../money";
-import { removeCategory, removeCheckpoint, removeRecurring, removeRule, removeSavingsAccount } from "../server/actions";
-import { CategoryBudgetsForm, CategoryForm, CheckpointForm, RecurringForm, RestoreForm, SavingsAccountForm, SettingsForm } from "./forms";
+import { accountBalanceAt, accountFlow, categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, savingsAccountBalances, type Ledger } from "../money";
+import { removeCategory, removeCheckpoint, removeCurrentAccount, removeRecurring, removeRule, removeSavingsAccount } from "../server/actions";
+import { CategoryBudgetsForm, CategoryForm, CheckpointForm, CurrentAccountForm, RecurringForm, RestoreForm, SavingsAccountForm, SettingsForm } from "./forms";
 import { ImportClient } from "./ImportClient";
 import { LinkPending, PendingButton } from "./motion";
 import { BASE, buttonClass, Panel, PanelTitle, Paper, Screen, squareClass, Tag } from "./kit";
@@ -10,8 +10,8 @@ import { BASE, buttonClass, Panel, PanelTitle, Paper, Screen, squareClass, Tag }
 /** Tabs of the settings, each at /reglages/<key> (the first one at /reglages). */
 export const SETTINGS_TABS = [
   { key: "", label: "Budget", emoji: "🎯", hint: "Plafond plaisir, par catégorie" },
-  { key: "livrets", label: "Livrets", emoji: "🐷", hint: "Tes comptes épargne et leur solde" },
-  { key: "import", label: "Import", emoji: "🏦", hint: "Relevés bancaires, règles" },
+  { key: "comptes", label: "Comptes", emoji: "🏦", hint: "Tes comptes, tes livrets et leur solde" },
+  { key: "import", label: "Import", emoji: "📥", hint: "Relevés bancaires, règles" },
   { key: "categories", label: "Catégories", emoji: "🏷️", hint: "Les tiennes" },
   { key: "recurrents", label: "Récurrents", emoji: "⟳", hint: "Ce qui revient chaque mois" },
   { key: "pointages", label: "Pointages", emoji: "📍", hint: "Le vrai solde du compte" },
@@ -73,12 +73,38 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
           </Panel>
     </>
   ),
-  livrets: (ledger) => {
+  comptes: (ledger, today) => {
     const balances = savingsAccountBalances(ledger);
+    const main = accountBalanceAt(ledger, today);
     const unassigned = (balances.get("") ?? 0) + ledger.settings.savingsStart;
     const total = [...balances.values()].reduce((n, b) => n + b, 0) + ledger.settings.savingsStart;
     return (
       <>
+        <Panel>
+          <PanelTitle aside={<Tag>{ledger.accounts.length + 1}</Tag>}>Tes comptes courants</PanelTitle>
+          <p className="mb-5 max-w-3xl text-zinc-400">
+            Le compte principal (Caisse d&apos;Épargne) suit tes pointages de solde. Chaque autre compte (Revolut, Crédit Mutuel…) a ses propres lignes, et les
+            virements entre tes comptes sont neutres : ni dépense ni revenu. Un compte pro est affiché ici mais reste hors de tes stats perso.
+          </p>
+          <ul className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <AccountCard emoji="💳" name="Compte courant" hint="principal · d'après tes pointages" balance={main} />
+            {ledger.accounts.map((a) => {
+              const count = ledger.entries.filter((e) => e.account === a.id || e.to === a.id).length;
+              return (
+                <AccountCard
+                  key={a.id}
+                  emoji={a.emoji}
+                  name={a.name}
+                  hint={`${a.personal ? "" : "pro · "}${count} ligne${count > 1 ? "s" : ""}`}
+                  balance={ledger.entries.reduce((n, e) => n + accountFlow(e, a.id), 0)}
+                  remove={count ? undefined : removeCurrentAccount.bind(null, a.id)}
+                />
+              );
+            })}
+          </ul>
+          <CurrentAccountForm />
+        </Panel>
+
         <Panel>
           <PanelTitle aside={<Tag>{formatMoney(total)} en tout</Tag>}>Tes livrets</PanelTitle>
           <p className="mb-5 max-w-3xl text-zinc-400">
@@ -88,7 +114,7 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
           {ledger.savingsAccounts.length > 0 && (
             <ul className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {ledger.savingsAccounts.map((a) => {
-                const count = ledger.entries.filter((e) => e.kind === "savings" && e.account === a.id).length;
+                const count = ledger.entries.filter((e) => e.kind === "savings" && e.livret === a.id).length;
                 return (
                   <li key={a.id} className="mn-shape flex items-center gap-3 px-4 py-3" style={{ "--mn-shape": "var(--mn-panel-2)" } as CSSProperties}>
                     <span className="flex h-11 w-11 shrink-0 -rotate-6 items-center justify-center bg-[var(--mn-yellow)] text-xl shadow-[3px_3px_0_var(--mn-ink)]" aria-hidden>
@@ -298,3 +324,25 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
         </Panel>
   ),
 };
+
+function AccountCard({ emoji, name, hint, balance, remove }: { emoji: string; name: string; hint: string; balance: number | null; remove?: () => Promise<void> }) {
+  return (
+    <li className="mn-shape flex items-center gap-3 px-4 py-3" style={{ "--mn-shape": "var(--mn-panel-2)" } as CSSProperties}>
+      <span className="flex h-11 w-11 shrink-0 -rotate-6 items-center justify-center bg-white text-xl shadow-[3px_3px_0_var(--mn-ink)]" aria-hidden>
+        {emoji}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="mn-punch block text-lg leading-tight">{name}</span>
+        <span className="block truncate text-sm text-zinc-500">{hint}</span>
+      </span>
+      <span className={`mn-punch text-xl ${balance !== null && balance < 0 ? "text-[var(--mn-red)]" : ""}`}>{balance === null ? "—" : formatMoney(balance)}</span>
+      {remove && (
+        <form action={remove}>
+          <PendingButton className={squareClass()} label={`Supprimer ${name}`}>
+            ✕
+          </PendingButton>
+        </form>
+      )}
+    </li>
+  );
+}

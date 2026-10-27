@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatSigned, signedAmount, type Categories, type Entry, type SavingsAccount } from "../money";
+import { formatSigned, signedAmount, type AccountNames, type Categories, type Entry } from "../money";
 import { EntryList } from "./EntryList";
 import { allCategoryOptions, Picker } from "./Picker";
 
 const PAGE = 150;
 
 /** The month's lines, filtered on the fly (text, category) and sorted, with the totals of what is shown. */
-export function JournalBrowser({ entries, categories, accounts, labelCounts }: { entries: Entry[]; categories: Categories; accounts: SavingsAccount[]; labelCounts: Record<string, number> }) {
+export function JournalBrowser({ entries, categories, names, labelCounts }: { entries: Entry[]; categories: Categories; names: AccountNames; labelCounts: Record<string, number> }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState<"date" | "amount">("date");
@@ -103,7 +103,7 @@ export function JournalBrowser({ entries, categories, accounts, labelCounts }: {
 
       {shown.length ? (
         <>
-          <EntryList entries={shown.slice(0, limit)} categories={categories} accounts={accounts} labelCounts={labelCounts} />
+          <EntryList entries={shown.slice(0, limit)} categories={categories} names={names} labelCounts={labelCounts} />
           {shown.length > limit && (
             <div className="text-center">
               <button type="button" onClick={() => setLimit(limit + PAGE)} className="mn-punch mn-ghost text-2xl">

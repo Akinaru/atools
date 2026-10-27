@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { amountInput, CUSTOMIZABLE_KINDS, type Categories, type Category, type Kind, type Settings } from "../money";
-import { createCategory, createCheckpoint, createSavingsAccount, updateCategoryBudgets, createGoal, createRecurring, moveMoney, removeGoal, restoreBackup, updateSettings, type FormState } from "../server/actions";
+import { createCategory, createCheckpoint, createCurrentAccount, createSavingsAccount, updateCategoryBudgets, createGoal, createRecurring, moveMoney, removeGoal, restoreBackup, updateSettings, type FormState } from "../server/actions";
 import { buttonClass, squareClass } from "./kit";
 import { categoryOptions, kindOptions, Picker } from "./Picker";
 
@@ -128,8 +128,8 @@ export function SettingsForm({ settings }: { settings: Settings }) {
 }
 
 export function RecurringForm({ categories }: { categories: Categories }) {
-  // Debts are one-off (they need a person): not offered as recurring.
-  const [kind, setKind] = useState<Exclude<Kind, "debt">>("income");
+  // Debts are one-off (they need a person), transfers stay between my accounts: not offered as recurring.
+  const [kind, setKind] = useState<Exclude<Kind, "debt" | "transfer">>("income");
   const [category, setCategory] = useState(categories.income[0].id);
   return (
     <ActionForm action={createRecurring} className="grid gap-4 sm:grid-cols-2">
@@ -142,7 +142,7 @@ export function RecurringForm({ categories }: { categories: Categories }) {
               name="kind"
               value={kind}
               onChange={(v) => {
-                setKind(v as Exclude<Kind, "debt">);
+                setKind(v as Exclude<Kind, "debt" | "transfer">);
                 setCategory(categories[v as Kind][0].id);
               }}
               options={kindOptions(["income", "charge", "savings", "expense"])}
@@ -257,6 +257,34 @@ export function CategoryForm() {
           <div>
             <button disabled={pending} className={buttonClass()}>
               <span>Créer</span>
+            </button>
+          </div>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+export function CurrentAccountForm() {
+  return (
+    <ActionForm action={createCurrentAccount} className="grid gap-4 sm:grid-cols-[5rem_1fr_auto_auto] sm:items-end">
+      {(pending) => (
+        <>
+          <label className={labelClass}>
+            Emoji
+            <input name="emoji" maxLength={16} placeholder="💳" className="w-full text-center" />
+          </label>
+          <label className={labelClass}>
+            Nom
+            <input name="name" required maxLength={30} placeholder="Revolut" />
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 pb-3 text-sm font-bold" title="Ses lignes ne comptent pas dans tes stats perso">
+            <input type="checkbox" name="pro" className="h-5 w-5 accent-[var(--mn-accent)]" />
+            Compte pro
+          </label>
+          <div>
+            <button disabled={pending} className={buttonClass()}>
+              <span>Ajouter</span>
             </button>
           </div>
         </>

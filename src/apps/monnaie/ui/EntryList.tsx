@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition, type CSSProperties } from "react";
-import { dayParts, formatSigned, getCategory, lineCategoryLabel, monthShortName, savingsDelta, signedAmount, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
+import { dayParts, formatMoney, formatSigned, getCategory, lineCategoryLabel, monthShortName, savingsDelta, signedAmount, type AccountNames, type Categories, type Entry, type Kind } from "../money";
 import { flipRegret, removeEntry } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { squareClass } from "./kit";
@@ -14,6 +14,7 @@ const STICKER: Record<Kind, string> = {
   income: "bg-white",
   savings: "bg-[var(--mn-yellow)]",
   debt: "bg-[var(--mn-red)]",
+  transfer: "bg-[#7cc4ff]",
 };
 const AMOUNT: Record<Kind, string> = {
   expense: "text-[var(--mn-accent)]",
@@ -21,10 +22,11 @@ const AMOUNT: Record<Kind, string> = {
   income: "text-white",
   savings: "text-[var(--mn-yellow)]",
   debt: "text-[var(--mn-red)]",
+  transfer: "text-[#7cc4ff]",
 };
 
 /** Entries of a month, grouped by day, newest first: a big date on the left, one ticket per entry. */
-export function EntryList({ entries, categories, accounts, labelCounts = {} }: { entries: Entry[]; categories: Categories; accounts: SavingsAccount[]; labelCounts?: Record<string, number> }) {
+export function EntryList({ entries, categories, names, labelCounts = {} }: { entries: Entry[]; categories: Categories; names: AccountNames; labelCounts?: Record<string, number> }) {
   const days = new Map<string, Entry[]>();
   for (const entry of entries) days.set(entry.date, [...(days.get(entry.date) ?? []), entry]);
 
@@ -47,7 +49,7 @@ export function EntryList({ entries, categories, accounts, labelCounts = {} }: {
             </header>
             <ul className="grid content-start gap-3">
               {list.map((entry) => (
-                <EntryRow key={entry.id} entry={entry} categories={categories} accounts={accounts} sameLabel={labelCounts[entry.label] ?? 1} tilt={row++ % 2 ? 0.35 : -0.35} />
+                <EntryRow key={entry.id} entry={entry} categories={categories} names={names} sameLabel={labelCounts[entry.label] ?? 1} tilt={row++ % 2 ? 0.35 : -0.35} />
               ))}
             </ul>
           </section>
@@ -61,7 +63,7 @@ export function EntryList({ entries, categories, accounts, labelCounts = {} }: {
  * One entry as a slightly tilted ticket: sticker, label, amount; actions show on hover. Deleting and
  * regretting are optimistic: the row reacts at once, the server follows (and the row comes back on error).
  */
-function EntryRow({ entry, categories, accounts, sameLabel, tilt }: { entry: Entry; categories: Categories; accounts: SavingsAccount[]; sameLabel: number; tilt: number }) {
+function EntryRow({ entry, categories, names, sameLabel, tilt }: { entry: Entry; categories: Categories; names: AccountNames; sameLabel: number; tilt: number }) {
   const category = getCategory(entry.kind, entry.category, categories);
   const [pending, startTransition] = useTransition();
   const [regret, setRegret] = useOptimistic(entry.regret);
@@ -106,7 +108,7 @@ function EntryRow({ entry, categories, accounts, sameLabel, tilt }: { entry: Ent
 
       <EntryDialog
         categories={categories}
-        accounts={accounts}
+        names={names}
         sameLabel={sameLabel}
         defaultDate={entry.date}
         entry={entry}
@@ -124,7 +126,7 @@ function EntryRow({ entry, categories, accounts, sameLabel, tilt }: { entry: Ent
               )}
             </span>
             <span className="block truncate text-sm text-[var(--mn-muted)]">
-              {lineCategoryLabel(entry, categories, accounts)}
+              {lineCategoryLabel(entry, categories, names)}
               {entry.person && ` · ${entry.person}`}
               {entry.note && ` · ${entry.note}`}
             </span>
@@ -151,7 +153,8 @@ function EntryRow({ entry, categories, accounts, sameLabel, tilt }: { entry: Ent
           </button>
         </span>
         <span className={`mn-punch min-w-28 text-right text-2xl sm:text-3xl ${AMOUNT[entry.kind]}`}>
-          {formatSigned(amount)}
+          {entry.kind === "transfer" ? formatMoney(entry.amount) : formatSigned(amount)}
+          {entry.kind === "transfer" && <span className="block text-right text-xs tracking-wider">interne</span>}
           {entry.kind === "savings" && <span className="block text-right text-xs tracking-wider">livret</span>}
           {entry.kind === "debt" && entry.category === "dette" && <span className="block text-right text-xs tracking-wider">à rendre</span>}
         </span>

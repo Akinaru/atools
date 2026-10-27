@@ -9,10 +9,19 @@ export type Cents = number;
  * savings: a savings account (livret) moving: transfer with the current account ("depot" / "retrait") or
  * interest it earned ("interets", the current account does not move)
  * debt: money owed between me and a `person` (categories below).
+ * transfer: money moved between two of my current accounts (`account` to `to`): neither spent nor earned.
+ * Every line but a transfer happens on one current account, `account` (absent = the main one, MAIN_ACCOUNT).
  */
-export type Kind = "income" | "expense" | "charge" | "savings" | "debt";
+export type Kind = "income" | "expense" | "charge" | "savings" | "debt" | "transfer";
 
-export const KIND_LABELS: Record<Kind, string> = { income: "Revenu", expense: "Dépense plaisir", charge: "Charge", savings: "Épargne", debt: "Dette" };
+export const KIND_LABELS: Record<Kind, string> = {
+  income: "Revenu",
+  expense: "Dépense plaisir",
+  charge: "Charge",
+  savings: "Épargne",
+  debt: "Dette",
+  transfer: "Virement interne",
+};
 
 export type Entry = {
   id: string;
@@ -29,11 +38,15 @@ export type Entry = {
   recurringId?: string;
   /** Debt only: who I owe, or who owes me. */
   person?: string;
-  /** Savings only: the savings account (SavingsAccount id); absent = not attributed yet. */
+  /** The current account the money moved on (CurrentAccount id); absent = the main one. Transfer: where it left. */
   account?: string;
+  /** Transfer only: the current account it went to. */
+  to?: string;
+  /** Savings only: the livret (SavingsAccount id); absent = not attributed yet. */
+  livret?: string;
   /** Set when imported from the current-account export: identifies the bank operation, so it is never imported twice. */
   importId?: string;
-  /** Savings only, set when matched with (or imported from) the savings account's own export: its operation id. */
+  /** Set when matched with (or imported from) the other account's own export (livret, Revolut…): its operation id. */
   pocketImportId?: string;
   /** Imported only: the day the bank booked it (YYYY-MM-DD), often 1 to 4 days after `date`. The balance follows it. */
   bookedDate?: string;
@@ -70,6 +83,21 @@ export type Settings = {
 /** A livret (Livret A, Livret Jeune…): its balance is the sum of its savings lines. */
 export type SavingsAccount = { id: string; name: string; emoji: string };
 
+/**
+ * A current account besides the main one (Revolut, Crédit Mutuel…). Its balance is the sum of its lines (its
+ * history is imported from the start). Not `personal` (a business account): left out of the personal stats.
+ */
+export type CurrentAccount = { id: string; name: string; emoji: string; personal: boolean };
+
+/** The main current account, where lines without `account` happen; its balance comes from the checkpoints. */
+export const MAIN_ACCOUNT: CurrentAccount = { id: "courant", name: "Compte courant", emoji: "💳", personal: true };
+
+/** The main account then the others. */
+export const currentAccounts = (ledger: Pick<Ledger, "accounts">): CurrentAccount[] => [MAIN_ACCOUNT, ...ledger.accounts];
+
+/** The account a line happens on (where a transfer leaves). */
+export const accountOf = (entry: Pick<Entry, "account">) => entry.account ?? MAIN_ACCOUNT.id;
+
 /** Real current-account balance read in the bank app at the end of a day; may be negative. */
 export type Checkpoint = { id: string; date: string; balance: Cents; createdAt: string };
 
@@ -85,6 +113,8 @@ export type ImportRule = {
   /** Label to use instead of the bank one. */
   label?: string;
   person?: string;
+  /** Transfer rule: my other account the money goes to or comes from. */
+  account?: string;
 };
 
 export type Ledger = {
@@ -93,6 +123,7 @@ export type Ledger = {
   goals: Goal[];
   rules: ImportRule[];
   checkpoints: Checkpoint[];
+  accounts: CurrentAccount[];
   savingsAccounts: SavingsAccount[];
   /** Categories created by the user, next to the built-in ones. */
   customCategories: CustomCategory[];
@@ -107,6 +138,7 @@ export const EMPTY_LEDGER: Ledger = {
   goals: [],
   rules: [],
   checkpoints: [],
+  accounts: [],
   savingsAccounts: [],
   customCategories: [],
   categoryBudgets: {},
@@ -172,13 +204,18 @@ export const CATEGORIES: Categories = {
     { id: "pret", label: "J'avance pour quelqu'un", emoji: "🫴" },
     { id: "recu", label: "On me rembourse", emoji: "📥" },
   ],
+  transfer: [{ id: "virement", label: "Entre mes comptes", emoji: "🔁" }],
 };
 
 type Movement = Pick<Entry, "kind" | "amount" | "category">;
 
-/** Effect on the current account: money in is positive, money out negative, an IOU ("Je dois") 0. */
+/**
+ * Effect on the line's current account: money in is positive, money out negative, an IOU ("Je dois") 0. A transfer
+ * stays between my accounts: 0 (see accountFlow for each side).
+ */
 export function signedAmount(entry: Movement): Cents {
   if (entry.kind === "income") return entry.amount;
+  if (entry.kind === "transfer") return 0;
   if (entry.kind === "savings") return entry.category === "retrait" ? entry.amount : entry.category === "depot" ? -entry.amount : 0;
   if (entry.kind === "debt") return entry.category === "dette" ? 0 : entry.category === "recu" ? entry.amount : -entry.amount;
   return -entry.amount;
@@ -211,18 +248,44 @@ export const transferDelta = (entry: Movement) =>
 /** Effect on the livret's balance: the transfers plus the interest it earned. */
 export const savingsDelta = (entry: Movement) => transferDelta(entry) + (entry.kind === "savings" && entry.category === "interets" ? entry.amount : 0);
 
-/** "Vers le livret · Livret A": the category of a line, with its livret for a savings line. */
-export const lineCategoryLabel = (entry: Pick<Entry, "kind" | "category" | "account">, categories: Categories, accounts: SavingsAccount[]) => {
+/** Effect of a line on one current account: a transfer takes from `account` and gives to `to`. */
+export function accountFlow(entry: Movement & Pick<Entry, "account" | "to">, accountId: string): Cents {
+  if (entry.kind === "transfer") return (entry.to === accountId ? entry.amount : 0) - (accountOf(entry) === accountId ? entry.amount : 0);
+  return accountOf(entry) === accountId ? signedAmount(entry) : 0;
+}
+
+/** Names of the accounts and livrets, to label the lines. */
+export type AccountNames = { accounts: CurrentAccount[]; livrets: SavingsAccount[] };
+
+export const accountNamesOf = (ledger: Pick<Ledger, "accounts" | "savingsAccounts">): AccountNames => ({ accounts: currentAccounts(ledger), livrets: ledger.savingsAccounts });
+
+/**
+ * "Vers le livret · Livret A", "Revolut → Compte courant", "Courses · Revolut": the category of a line, with its
+ * livret, the two accounts of a transfer, or its account when it is not the main one.
+ */
+export const lineCategoryLabel = (entry: Pick<Entry, "kind" | "category" | "account" | "to" | "livret">, categories: Categories, names: AccountNames) => {
+  const name = (id: string | undefined) => names.accounts.find((a) => a.id === (id ?? MAIN_ACCOUNT.id))?.name ?? "?";
+  if (entry.kind === "transfer") return `${name(entry.account)} → ${name(entry.to)}`;
   const label = getCategory(entry.kind, entry.category, categories).label;
-  const account = entry.kind === "savings" && accounts.find((a) => a.id === entry.account);
-  return account ? `${label} · ${account.name}` : label;
+  const parts = [label];
+  const livret = entry.kind === "savings" && names.livrets.find((a) => a.id === entry.livret);
+  if (livret) parts.push(livret.name);
+  if (accountOf(entry) !== MAIN_ACCOUNT.id) parts.push(name(entry.account));
+  return parts.join(" · ");
 };
 
-/** Balance of each savings account today; lines not attributed to an account are under "". */
+/** Balance of each savings account today; lines not attributed to a livret are under "". */
 export function savingsAccountBalances(ledger: Pick<Ledger, "entries">): Map<string, Cents> {
   const balances = new Map<string, Cents>();
-  for (const e of ledger.entries) if (e.kind === "savings") balances.set(e.account ?? "", (balances.get(e.account ?? "") ?? 0) + savingsDelta(e));
+  for (const e of ledger.entries) if (e.kind === "savings") balances.set(e.livret ?? "", (balances.get(e.livret ?? "") ?? 0) + savingsDelta(e));
   return balances;
+}
+
+/** The lines of the personal accounts only (a business account is left out of the stats). */
+export function personalLedger<T extends Pick<Ledger, "entries" | "accounts">>(ledger: T): T {
+  const business = new Set(ledger.accounts.filter((a) => !a.personal).map((a) => a.id));
+  if (!business.size) return ledger;
+  return { ...ledger, entries: ledger.entries.filter((e) => !business.has(accountOf(e))) };
 }
 
 
@@ -371,7 +434,9 @@ export const byDateDesc = (a: Entry, b: Entry) => b.date.localeCompare(a.date) |
 
 export function monthStats(ledger: Ledger, month: string): MonthStats {
   const categories = categoriesOf(ledger);
-  const entries = ledger.entries.filter((e) => monthOf(e.date) === month).sort(byDateDesc);
+  const all = ledger.entries.filter((e) => monthOf(e.date) === month).sort(byDateDesc);
+  // The totals are about my own money: the lines of a business account are listed, not counted.
+  const entries = personalLedger({ ...ledger, entries: all }).entries;
   const income = sum(entries, "income");
   const spent = sum(entries, "expense");
   const charges = sum(entries, "charge");
@@ -392,7 +457,7 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
   const expenses = entries.filter((e) => e.kind === "expense");
   return {
     month,
-    entries,
+    entries: all,
     income,
     spent,
     regret: expenses.reduce((n, e) => (e.regret ? n + e.amount : n), 0),
@@ -422,7 +487,7 @@ export function monthDaily(ledger: Ledger, month: string): MonthDaily {
   const plaisir = Array.from({ length: days }, () => 0);
   const charges = Array.from({ length: days }, () => 0);
   const garde = Array.from({ length: days }, () => 0);
-  for (const e of ledger.entries) {
+  for (const e of personalLedger(ledger).entries) {
     if (monthOf(e.date) !== month) continue;
     const day = Number(e.date.slice(8)) - 1;
     if (e.kind === "expense") plaisir[day] += e.amount;
@@ -454,6 +519,7 @@ export type YearStats = {
 };
 
 export function yearStats(ledger: Ledger, year: number): YearStats {
+  const mine = personalLedger(ledger).entries.filter((e) => e.date.startsWith(`${year}-`));
   const months = Array.from({ length: 12 }, (_, i) => monthStats(ledger, `${year}-${String(i + 1).padStart(2, "0")}`));
   return {
     year,
@@ -465,8 +531,8 @@ export function yearStats(ledger: Ledger, year: number): YearStats {
     regret: months.reduce((n, m) => n + m.regret, 0),
     kept: months.reduce((n, m) => n + m.kept, 0),
     left: months.reduce((n, m) => n + m.left, 0),
-    byCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "expense", categoriesOf(ledger)),
-    chargesByCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "charge", categoriesOf(ledger)),
+    byCategory: totals(mine, "expense", categoriesOf(ledger)),
+    chargesByCategory: totals(mine, "charge", categoriesOf(ledger)),
   };
 }
 
@@ -480,12 +546,12 @@ export const savingsBalance = (ledger: Ledger): Cents => ledger.settings.savings
 /** The day an entry hits the account balance: the bank's booking day when known, else the payment day. */
 const balanceDate = (e: Entry) => e.bookedDate ?? e.date;
 
-/** Sum of the effects on the current account of the entries booked in (from, to]. */
+/** Sum of the effects on the main current account of the entries booked in (from, to]. */
 const flowBetween = (entries: Entry[], from: string, to: string) =>
-  entries.reduce((n, e) => (balanceDate(e) > from && balanceDate(e) <= to ? n + signedAmount(e) : n), 0);
+  entries.reduce((n, e) => (balanceDate(e) > from && balanceDate(e) <= to ? n + accountFlow(e, MAIN_ACCOUNT.id) : n), 0);
 
 /**
- * Current-account balance at the end of `date`, from the closest checkpoint (the last one on or before `date`,
+ * Main current-account balance at the end of `date`, from the closest checkpoint (the last one on or before `date`,
  * else the first one after): operations in between are added or taken back. Null without any checkpoint.
  */
 export function accountBalanceAt(ledger: Ledger, date: string): Cents | null {
@@ -507,6 +573,30 @@ export function checkpointChecks(ledger: Ledger): { checkpoint: Checkpoint; expe
     const expected = previous.balance + flowBetween(ledger.entries, previous.date, checkpoint.date);
     return { checkpoint, expected, gap: checkpoint.balance - expected };
   });
+}
+
+/** Level of one account at the end of each month asked; null when unknown (no balance checkpoint, future). */
+export type AccountLevels = { id: string; name: string; emoji: string; type: "courant" | "livret"; personal: boolean; values: (Cents | null)[] };
+
+/**
+ * The level of every account at the end of each month of `months` ("YYYY-MM", in order): the main current account
+ * (from the balance checkpoints), the other current accounts (sum of their lines), each livret, and the savings
+ * not attributed to a livret when there are some. Months after `today` are null.
+ */
+export function accountLevels(ledger: Ledger, months: string[], today: string): AccountLevels[] {
+  const ends = months.map((m) => `${m}-${String(daysInMonth(m)).padStart(2, "0")}`);
+  const known = (i: number) => months[i] <= monthOf(today);
+  const savingsAt = (end: string, livret: string) =>
+    ledger.entries.reduce((n, e) => (e.kind === "savings" && (e.livret ?? "") === livret && e.date <= end ? n + savingsDelta(e) : n), 0);
+  const flowAt = (end: string, account: string) => ledger.entries.reduce((n, e) => (balanceDate(e) <= end ? n + accountFlow(e, account) : n), 0);
+  const levels: AccountLevels[] = [
+    { ...MAIN_ACCOUNT, type: "courant", values: ends.map((end, i) => (known(i) ? accountBalanceAt(ledger, end > today ? today : end) : null)) },
+    ...ledger.accounts.map((a) => ({ ...a, type: "courant" as const, values: ends.map((end, i) => (known(i) ? flowAt(end, a.id) : null)) })),
+    ...ledger.savingsAccounts.map((a) => ({ ...a, type: "livret" as const, personal: true, values: ends.map((end, i) => (known(i) ? savingsAt(end, a.id) : null)) })),
+  ];
+  const loose = ends.map((end, i) => (known(i) ? ledger.settings.savingsStart + savingsAt(end, "") : null));
+  if (loose.some((v) => v)) levels.push({ id: "", name: "Épargne sans livret", emoji: "🪙", type: "livret", personal: true, values: loose });
+  return levels;
 }
 
 /** Savings account money not assigned to a goal yet (negative when the goals ask for more than the livret holds). */

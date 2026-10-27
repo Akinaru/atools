@@ -160,6 +160,8 @@ export const api: ApiRoute[] = [
             category: s.category,
             label: s.label,
             person: s.person,
+            account: s.account,
+            to: s.to,
             amount: Math.abs(op.amount),
             date: op.date,
             bookedDate: op.bookedDate,
