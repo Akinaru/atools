@@ -5,6 +5,8 @@ import { api } from "./api";
 import { MONTH_PATTERN, toDateString } from "./money";
 import { readLedger } from "./server/store";
 import { GoalsView } from "./ui/GoalsView";
+import { ImportView } from "./ui/ImportView";
+import { OperationsView } from "./ui/OperationsView";
 import { MonthView } from "./ui/MonthView";
 import { SettingsView } from "./ui/SettingsView";
 import { YearView } from "./ui/YearView";
@@ -21,7 +23,9 @@ async function Page({ path }: { path: string[] }) {
   if (section === "mois" && param && MONTH_PATTERN.test(param)) return <MonthView ledger={ledger} month={param} today={today} />;
   if (section === "annee" && (!param || /^\d{4}$/.test(param))) return <YearView ledger={ledger} year={Number(param ?? today.slice(0, 4))} today={today} />;
   if (section === "objectifs" && !param) return <GoalsView ledger={ledger} />;
-  if (section === "reglages" && !param) return <SettingsView ledger={ledger} />;
+  if (section === "reglages" && !param) return <SettingsView ledger={ledger} today={today} />;
+  if (section === "import" && !param) return <ImportView />;
+  if (section === "operations" && !param) return <OperationsView ledger={ledger} />;
   notFound();
 }
 

@@ -14,8 +14,8 @@ export function GoalsView({ ledger }: { ledger: Ledger }) {
       title="Objectifs"
       subtitle={
         <p>
-          {formatMoney(saved, true)} rangés sur {formatMoney(targets, true)} visés ·{" "}
-          <span className={free < 0 ? "text-[var(--mn-red)]" : "text-[var(--mn-accent)]"}>{formatMoney(free, true)} du livret pas encore attribués</span>
+          {formatMoney(saved)} rangés sur {formatMoney(targets)} visés ·{" "}
+          <span className={free < 0 ? "text-[var(--mn-red)]" : "text-[var(--mn-accent)]"}>{formatMoney(free)} du livret pas encore attribués</span>
         </p>
       }
     >
@@ -47,7 +47,7 @@ export function GoalsView({ ledger }: { ledger: Ledger }) {
                 <div className="mn-grow h-full bg-[var(--mn-accent)]" style={{ width: `${ratio * 100}%` }} />
                 <span className="mn-punch absolute inset-0 flex items-center justify-center pt-0.5 text-sm">{Math.floor(ratio * 100)} %</span>
               </div>
-              <p className="mn-punch mb-4 mt-3 text-lg">{done ? "Bien joué. Tu peux le dépenser sans regret." : `Encore ${formatMoney(goal.target - goal.saved, true)}`}</p>
+              <p className="mn-punch mb-4 mt-3 text-lg">{done ? "Bien joué. Tu peux le dépenser sans regret." : `Encore ${formatMoney(goal.target - goal.saved)}`}</p>
               <GoalMoneyForm id={goal.id} />
             </Paper>
           );

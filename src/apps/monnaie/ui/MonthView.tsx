@@ -2,22 +2,26 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import {
   budgetMood,
+  categoriesOf,
+  checkpointChecks,
   daysInMonth,
   debtBalances,
   formatMoney,
   formatSigned,
+  monthDaily,
   monthName,
   monthStats,
   pendingRecurring,
-  savingsDelta,
   shiftMonth,
   type CategoryTotal,
   type Ledger,
 } from "../money";
+import { categoryAverages, forecast } from "../insights";
 import { addRecurringToMonth } from "../server/actions";
-import { BudgetGauge, CategoryBars, SpendingCurve } from "./charts";
+import { CategoryBars } from "./charts";
+import { MonthCompareChart } from "./MonthCompareChart";
 import { EntryDialog } from "./EntryDialog";
-import { EntryList } from "./EntryList";
+import { OperationsClient } from "./OperationsClient";
 import { KeyNav } from "./KeyNav";
 import { BASE, ButtonLink, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, squareClass, Stamp, Tag } from "./kit";
 
@@ -34,15 +38,24 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
   const budgetLeft = stats.budget - stats.spent;
   const perDayLeft = isCurrent && budgetLeft > 0 ? Math.floor(budgetLeft / (days - day + 1)) : null;
   const projection = isCurrent && day > 0 ? Math.round((stats.spent / day) * days) : null;
-  const spentDelta = previous.spent ? (stats.spent - previous.spent) / previous.spent : null;
   const defaultDate = isCurrent ? today : `${month}-01`;
-  const transfers = stats.entries.filter((e) => e.kind === "savings");
-  const deposited = transfers.reduce((n, e) => n + Math.max(savingsDelta(e), 0), 0);
-  const withdrawn = transfers.reduce((n, e) => n + Math.max(-savingsDelta(e), 0), 0);
+  // Put aside this month, on the livret.
+  const putAside = stats.saved;
   // The slate is all-time: what is still owed today, whatever the month shown.
   const debts = debtBalances(ledger.entries).filter((d) => d.iOwe || d.owesMe);
   const people = [...new Set(ledger.entries.flatMap((e) => (e.person ? [e.person] : [])))].sort((a, b) => a.localeCompare(b));
   const year = month.slice(0, 4);
+  const categories = categoriesOf(ledger);
+  const outlook = forecast(ledger, today);
+  // The real balance: today for the current month, at the end of the month otherwise.
+  const balance = isCurrent ? outlook.balance : stats.accountBalance;
+  const lastCheck = checkpointChecks(ledger).at(-1);
+  // The 5 previous months with data, to compare this month day by day.
+  const compareMonths = Array.from({ length: 12 }, (_, i) => shiftMonth(month, -(i + 1)))
+    .filter((m) => ledger.entries.some((e) => e.date.startsWith(m)))
+    .slice(0, 5);
+  const labelCounts: Record<string, number> = {};
+  for (const e of ledger.entries) labelCounts[e.label] = (labelCounts[e.label] ?? 0) + 1;
 
   return (
     <Screen
@@ -70,7 +83,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
               Aujourd&apos;hui
             </ButtonLink>
           )}
-          <EntryDialog defaultDate={defaultDate} hotkey people={people} />
+          <EntryDialog categories={categories} defaultDate={defaultDate} hotkey people={people} />
         </>
       }
     >
@@ -88,129 +101,156 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
         </div>
       )}
 
-      <div className="grid gap-10 lg:grid-cols-2 2xl:grid-cols-3">
-        <Paper tilt={-1.2}>
-          {stats.left < 0 && <Stamp className="right-6 top-8 text-2xl">Dans le rouge</Stamp>}
-          <Tag className="!text-zinc-500">Il te reste sur le compte</Tag>
-          <p className={`mn-punch mt-2 text-6xl sm:text-7xl ${stats.left < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatSigned(stats.left, true)}</p>
-          <ul className="mn-punch mt-7 grid gap-3 text-xl">
-            <Diamond>
-              Encaissé <span className="ml-auto">{formatMoney(stats.income)}</span>
-            </Diamond>
-            <Diamond className="text-zinc-500">
-              Charges <span className="ml-auto">−{formatMoney(stats.charges)}</span>
-            </Diamond>
-            <Diamond>
-              Cramé pour le plaisir <span className="ml-auto">−{formatMoney(stats.spent)}</span>
-            </Diamond>
-            <Diamond>
-              Mis sur le livret <span className="ml-auto">{formatSigned(-stats.saved)}</span>
-            </Diamond>
-            {stats.debtFlow !== 0 && (
-              <Diamond className="text-zinc-500">
-                Dettes <span className="ml-auto">{formatSigned(stats.debtFlow)}</span>
-              </Diamond>
-            )}
-            {stats.regret > 0 && (
-              <Diamond className="text-[var(--mn-red)]">
-                Regretté 😬 <span className="ml-auto">{formatMoney(stats.regret)}</span>
-              </Diamond>
-            )}
-          </ul>
-        </Paper>
-
-        <Paper tilt={0.8}>
-          {stats.saved > 0 && stats.saved > previous.saved && <Stamp tone="ink" className="right-6 top-7 text-2xl" tilt={-7}>En hausse</Stamp>}
-          {stats.saved < 0 && <Stamp className="right-6 top-7 text-2xl" tilt={6}>Pioché</Stamp>}
-          <Tag className="!text-zinc-500">Livret</Tag>
-          <p className={`mn-punch mt-2 text-6xl sm:text-7xl ${stats.saved < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatSigned(stats.saved, true)}</p>
-          <p className="mt-1 font-semibold text-zinc-500">mis de côté ce mois-ci</p>
-          <ul className="mn-punch mt-7 grid gap-3 text-xl">
-            <Diamond>
-              Solde fin {monthName(month)} <span className="ml-auto">{formatMoney(stats.savingsBalance)}</span>
-            </Diamond>
-            <Diamond className="text-zinc-500">
-              Versé <span className="ml-auto">+{formatMoney(deposited)}</span>
-            </Diamond>
-            <Diamond className="text-zinc-500">
-              Retiré <span className="ml-auto">−{formatMoney(withdrawn)}</span>
-            </Diamond>
-            <Diamond>
-              Taux d&apos;épargne{" "}
-              <span className="ml-auto">{stats.savingsRate === null ? "—" : `${Math.round(stats.savingsRate * 100)} %`}</span>
-            </Diamond>
-            <Diamond className="text-zinc-500">
-              {monthName(previous.month)} <span className="ml-auto">{formatSigned(previous.saved)}</span>
-            </Diamond>
-          </ul>
-        </Paper>
-
-        <Paper tilt={1.4}>
-          {stats.budget > 0 && stats.spent > stats.budget && <Stamp className="right-6 top-6 text-2xl" tilt={8}>Budget explosé</Stamp>}
-          {stats.budget > 0 && !isFuture && !isCurrent && stats.spent <= stats.budget && stats.entries.length > 0 && (
-            <Stamp tone="ink" className="right-6 top-6 text-2xl" tilt={7}>Tenu ✓</Stamp>
-          )}
-          <Tag className="!text-zinc-500">Budget plaisir</Tag>
-          {stats.budget ? (
-            <>
-              <p className="mn-punch mb-8 mt-2 text-4xl">
-                {budgetLeft >= 0 ? `${formatMoney(budgetLeft, true)} dispo` : `${formatMoney(-budgetLeft, true)} de trop`}
-              </p>
-              <BudgetGauge spent={stats.spent} budget={stats.budget} pace={isCurrent ? day / days : undefined} />
-            </>
-          ) : (
-            <p className="mt-3 text-lg">
-              Fixe un budget mensuel pour tes dépenses plaisir dans les{" "}
-              <Link href={`${BASE}/reglages`} className="font-bold underline decoration-[var(--mn-accent)] decoration-4 underline-offset-4">
-                réglages
-              </Link>
-              .
+      {/* Cockpit: the month's result, then the real balance, the budget and the savings next to it. */}
+      <div className="grid items-start gap-8 xl:grid-cols-[1.35fr_1fr]">
+        <Paper tilt={-1}>
+          {stats.kept < 0 && <Stamp className="right-6 top-8 text-2xl">Dans le rouge</Stamp>}
+          <Tag className="!text-zinc-500">Bilan {monthName(month).match(/^[aeiouy]/i) ? "d'" : "de "}{monthName(month)}</Tag>
+          <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-2">
+            <p className={`mn-punch text-7xl sm:text-8xl ${stats.kept < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatSigned(stats.kept)}</p>
+            <p className="max-w-xs pb-2 font-semibold text-zinc-600">
+              {stats.kept < 0 ? "dépensé en plus de ce que tu as gagné." : "gardé sur ce que tu as gagné."}
+              {previous.entries.length > 0 && (
+                <b className="block text-[var(--mn-ink)]">
+                  {stats.kept >= previous.kept ? "Mieux" : "Moins bien"} qu&apos;en {monthName(previous.month)} ({formatSigned(previous.kept)}).
+                </b>
+              )}
             </p>
+          </div>
+          {/* Where the kept money went: the savings pockets, and what is left (or taken) on the account. */}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <span className="mn-punch -rotate-1 bg-[var(--mn-yellow)] px-3 pb-1 pt-1.5 text-lg text-[var(--mn-ink)] shadow-[3px_3px_0_var(--mn-ink)]">
+              {formatSigned(putAside)} sur l&apos;épargne
+            </span>
+            <span
+              className={`mn-punch rotate-1 px-3 pb-1 pt-1.5 text-lg shadow-[3px_3px_0_var(--mn-ink)] ${stats.left < 0 ? "bg-[var(--mn-red)] text-white" : "bg-[var(--mn-ink)] text-white"}`}
+            >
+              {formatSigned(stats.left)} sur le compte
+            </span>
+          </div>
+          <div className={`mt-7 grid grid-cols-2 gap-4 border-t-2 border-dashed border-zinc-200 pt-5 ${stats.debtFlow ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+            <MiniStat label="Encaissé" value={formatMoney(stats.income)} />
+            <MiniStat label="Charges" value={formatSigned(-stats.charges)} muted />
+            <MiniStat label="Plaisir" value={formatSigned(-stats.spent)} accent />
+            {stats.debtFlow !== 0 && <MiniStat label="Dettes" value={formatSigned(stats.debtFlow)} muted />}
+          </div>
+          {(stats.biggest || stats.regret > 0) && (
+            <ul className="mt-5 grid gap-1.5 text-sm text-zinc-600">
+              {stats.biggest && (
+                <Diamond>
+                  <span>
+                    Plus grosse folie : <b className="text-[var(--mn-ink)]">{stats.biggest.label}</b> ({formatMoney(stats.biggest.amount)})
+                  </span>
+                </Diamond>
+              )}
+              {stats.regret > 0 && (
+                <Diamond className="text-[var(--mn-red)]">
+                  <span>Regretté 😬 : {formatMoney(stats.regret)}</span>
+                </Diamond>
+              )}
+            </ul>
           )}
-          <ul className="mt-7 grid gap-2 text-base">
-            {perDayLeft !== null && (
-              <Diamond>
-                <span>
-                  Tu peux encore cramer <b>{formatMoney(perDayLeft)}</b> / jour
-                </span>
-              </Diamond>
-            )}
-            {projection !== null && stats.spent > 0 && (
-              <Diamond>
-                <span>
-                  À ce rythme : <b>{formatMoney(projection, true)}</b> fin {monthName(month)}
-                </span>
-              </Diamond>
-            )}
-            {spentDelta !== null && (
-              <Diamond>
-                <span>
-                  <b>{spentDelta > 0 ? `+${Math.round(spentDelta * 100)} %` : `${Math.round(spentDelta * 100)} %`}</b> vs {monthName(previous.month)} (
-                  {formatMoney(previous.spent, true)})
-                </span>
-              </Diamond>
-            )}
-            {stats.biggest && (
-              <Diamond>
-                <span>
-                  Plus grosse folie : <b>{stats.biggest.label}</b> ({formatMoney(stats.biggest.amount)})
-                </span>
-              </Diamond>
-            )}
-          </ul>
         </Paper>
+
+        <div className="grid gap-6">
+          <Panel>
+            <div className="flex items-baseline justify-between gap-3">
+              <Tag>Solde réel</Tag>
+              {lastCheck && (
+                <Link href={`${BASE}/reglages#pointages`} className="text-sm font-semibold text-[var(--mn-muted)] hover:text-white">
+                  [pointé le {lastCheck.checkpoint.date.slice(8)}/{lastCheck.checkpoint.date.slice(5, 7)}{" "}
+                  {lastCheck.gap === null || lastCheck.gap === 0 ? "✓" : <span className="text-[var(--mn-red)]">⚠ {formatSigned(lastCheck.gap)}</span>}]
+                </Link>
+              )}
+            </div>
+            {balance === null ? (
+              <p className="mt-3 text-lg">
+                <Link href={`${BASE}/reglages#pointages`} className="font-bold underline decoration-[var(--mn-accent)] decoration-4 underline-offset-4">
+                  Pointe ton solde
+                </Link>{" "}
+                pour suivre ton vrai compte et sa prévision au 31.
+              </p>
+            ) : (
+              <>
+                <p className={`mn-punch mt-2 text-5xl ${balance < 0 ? "text-[var(--mn-red)]" : ""}`}>{formatMoney(balance)}</p>
+                <p className="mt-1 text-[var(--mn-muted)]">
+                  {isCurrent && outlook.endOfMonth !== null ? (
+                    <>
+                      aujourd&apos;hui · prévu au {days}/{month.slice(5)} : <b className="text-white">{formatMoney(outlook.endOfMonth)}</b>
+                      {outlook.upcoming.length > 0 && ` (${outlook.upcoming.map((r) => r.label.split(" ")[0]).join(", ")} à venir)`}
+                    </>
+                  ) : (
+                    <>fin {monthName(month)}</>
+                  )}
+                </p>
+              </>
+            )}
+          </Panel>
+
+          <Panel>
+            <div className="flex items-baseline justify-between gap-3">
+              <Tag>Budget plaisir</Tag>
+              {stats.budget > 0 && (
+                <span className={`mn-punch text-2xl ${stats.spent > stats.budget ? "text-[var(--mn-red)]" : "text-[var(--mn-accent)]"}`}>
+                  {Math.round((stats.spent / stats.budget) * 100)} %
+                </span>
+              )}
+            </div>
+            {stats.budget > 0 ? (
+              <>
+                <div className="relative mb-3 mt-4 h-3 bg-black/30">
+                  <div
+                    className="mn-grow h-full"
+                    style={{ width: `${Math.min(stats.spent / stats.budget, 1) * 100}%`, background: stats.spent > stats.budget ? "var(--mn-red)" : "var(--mn-accent)" }}
+                  />
+                  {isCurrent && <span className="absolute -bottom-1.5 -top-1.5 w-[3px] bg-white" style={{ left: `${(day / days) * 100}%` }} title="Rythme idéal aujourd'hui" />}
+                </div>
+                <p className="text-[var(--mn-muted)]">
+                  {budgetLeft >= 0 ? `${formatMoney(budgetLeft)} dispo` : `${formatMoney(-budgetLeft)} de trop`}
+                  {perDayLeft !== null && ` · ${formatMoney(perDayLeft)} / jour jusqu'au ${days}`}
+                  {projection !== null && stats.spent > 0 && ` · à ce rythme ${formatMoney(projection)}`}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-[var(--mn-muted)]">
+                {formatMoney(stats.spent)} cramés ·{" "}
+                <Link href={`${BASE}/reglages`} className="font-bold text-white underline decoration-[var(--mn-accent)] decoration-4 underline-offset-4">
+                  fixe un budget
+                </Link>
+              </p>
+            )}
+          </Panel>
+
+          <Panel>
+            <div className="flex items-baseline justify-between gap-3">
+              <Tag>Épargne</Tag>
+              {stats.savingsRate !== null && <span className="mn-punch text-2xl text-[var(--mn-yellow)]">{Math.round(stats.savingsRate * 100)} %</span>}
+            </div>
+            <p className={`mn-punch mt-2 text-4xl ${putAside < 0 ? "text-[var(--mn-red)]" : ""}`}>
+              {formatSigned(putAside)} <span className="text-lg text-[var(--mn-muted)]">mis de côté</span>
+            </p>
+            <p className="mt-1 text-[var(--mn-muted)]">
+              Solde du livret : {formatMoney(stats.savingsBalance)}
+            </p>
+          </Panel>
+        </div>
       </div>
 
-      <div className="mt-12 grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
         <Panel>
-          <PanelTitle aside={<Tag>Courbe</Tag>}>Le mois au jour le jour</PanelTitle>
-          <SpendingCurve stats={stats} today={isCurrent ? day : undefined} />
-        </Panel>
-        <Panel>
-          <PanelTitle aside={<Tag>{stats.byCategory.length} catégories</Tag>}>Où part le fric</PanelTitle>
-          {stats.byCategory.length ? <CategoryBars totals={stats.byCategory} dark /> : <p className="text-zinc-500">Aucune dépense plaisir ce mois-ci.</p>}
+          <PanelTitle aside={<Tag>vs ta moyenne</Tag>}>Catégories</PanelTitle>
+          {stats.byCategory.length ? (
+            <CategoryBars totals={stats.byCategory} dark budgets={ledger.categoryBudgets} averages={categoryAverages(ledger, month, "expense")} />
+          ) : (
+            <p className="text-zinc-500">Aucune dépense plaisir ce mois-ci.</p>
+          )}
           <TotalsList title="Les charges" totals={stats.chargesByCategory} total={stats.charges} empty="Aucune charge ce mois-ci." />
           <TotalsList title="D'où vient l'argent" totals={stats.incomeByCategory} total={stats.income} />
+        </Panel>
+
+        <Panel className="lg:col-span-2">
+          <PanelTitle aside={<Tag>cumulé, jour par jour</Tag>}>{monthName(month)} vs les autres mois</PanelTitle>
+          <MonthCompareChart current={monthDaily(ledger, month)} others={compareMonths.map((m) => monthDaily(ledger, m))} today={isCurrent ? day : undefined} />
         </Panel>
       </div>
 
@@ -244,10 +284,10 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
         </Panel>
       )}
 
-      <Panel className="mt-6">
-        <PanelTitle aside={<Tag>{stats.entries.length} lignes</Tag>}>Le journal</PanelTitle>
+      <Panel className="mt-6 scroll-mt-6" id="journal">
+        <PanelTitle aside={<Tag>{stats.entries.length} lignes</Tag>}>Le journal du mois</PanelTitle>
         {stats.entries.length ? (
-          <EntryList entries={stats.entries} />
+          <OperationsClient entries={stats.entries} categories={categories} labelCounts={labelCounts} periods={false} embedded />
         ) : (
           <div className="flex flex-col items-center gap-6 py-12 text-center">
             <Slab tilt={-3} className="text-4xl">
@@ -284,6 +324,16 @@ function TotalsList({ title, totals, total, empty }: { title: string; totals: Ca
       ) : (
         <p className="text-sm text-zinc-500">{empty}</p>
       )}
+    </div>
+  );
+}
+
+/** Small label + number of the month's breakdown, under the big result. */
+function MiniStat({ label, value, muted = false, accent = false }: { label: string; value: string; muted?: boolean; accent?: boolean }) {
+  return (
+    <div>
+      <div className="text-xs font-bold uppercase tracking-wider text-zinc-500">{label}</div>
+      <div className={`mn-punch text-2xl ${accent ? "text-[var(--mn-accent)]" : muted ? "text-zinc-500" : ""}`}>{value}</div>
     </div>
   );
 }

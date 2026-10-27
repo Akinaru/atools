@@ -254,6 +254,16 @@
   animation: mn-grow 0.7s var(--mn-ease) both;
 }
 
+/* Chart lines draw themselves (paths with pathLength="1"). */
+@keyframes mn-draw {
+  from { stroke-dashoffset: 1; }
+}
+
+.mn-draw {
+  stroke-dasharray: 1;
+  animation: mn-draw 0.9s cubic-bezier(0.3, 0.9, 0.3, 1) both;
+}
+
 @keyframes mn-slam {
   0% { opacity: 0; transform: scale(2.4) rotate(var(--mn-tilt, -8deg)); }
   60% { opacity: 1; transform: scale(0.94) rotate(var(--mn-tilt, -8deg)); }
@@ -265,7 +275,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mn-drop, .mn-grow, .mn-slam, .mn-boil::before, .mn-btn::before { animation: none; }
+  .mn-drop, .mn-grow, .mn-slam, .mn-draw, .mn-boil::before, .mn-btn::before { animation: none; }
 }
 
 /* --- Forms --- */

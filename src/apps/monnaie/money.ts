@@ -6,12 +6,12 @@ export type Cents = number;
 
 /**
  * income: money in · expense: unnecessary spending (the budget) · charge: necessary bills (rent, energy…)
- * savings: transfer between the current account and the savings account (category "depot" or "retrait")
+ * savings: transfer between the current account and the livret ("depot" / "retrait")
  * debt: money owed between me and a `person` (categories below).
  */
 export type Kind = "income" | "expense" | "charge" | "savings" | "debt";
 
-export const KIND_LABELS: Record<Kind, string> = { income: "Revenu", expense: "Dépense plaisir", charge: "Charge", savings: "Livret", debt: "Dette" };
+export const KIND_LABELS: Record<Kind, string> = { income: "Revenu", expense: "Dépense plaisir", charge: "Charge", savings: "Épargne", debt: "Dette" };
 
 export type Entry = {
   id: string;
@@ -28,6 +28,10 @@ export type Entry = {
   recurringId?: string;
   /** Debt only: who I owe, or who owes me. */
   person?: string;
+  /** Set when imported from a bank export: identifies the bank operation, so it is never imported twice. */
+  importId?: string;
+  /** Imported only: the day the bank booked it (YYYY-MM-DD), often 1 to 4 days after `date`. The balance follows it. */
+  bookedDate?: string;
   createdAt: string;
 };
 
@@ -58,18 +62,56 @@ export type Settings = {
   savingsStart: Cents;
 };
 
+/** Real current-account balance read in the bank app at the end of a day; may be negative. */
+export type Checkpoint = { id: string; date: string; balance: Cents; createdAt: string };
+
+/** What a bank operation becomes on import, learned from the user's corrections. */
+export type ImportRule = {
+  /** Normalized bank label (see normalizeBankLabel), or a word it contains when `contains` is set. */
+  match: string;
+  contains?: boolean;
+  /** Ignore the operation instead of importing it. */
+  ignore?: boolean;
+  kind?: Kind;
+  category?: string;
+  /** Label to use instead of the bank one. */
+  label?: string;
+  person?: string;
+};
+
 export type Ledger = {
   entries: Entry[];
   recurring: Recurring[];
   goals: Goal[];
+  rules: ImportRule[];
+  checkpoints: Checkpoint[];
+  /** Categories created by the user, next to the built-in ones. */
+  customCategories: CustomCategory[];
+  /** Monthly budget per plaisir category id (cents); absent = no budget. */
+  categoryBudgets: Record<string, Cents>;
   settings: Settings;
 };
 
-export const EMPTY_LEDGER: Ledger = { entries: [], recurring: [], goals: [], settings: { monthlyBudget: 0, savingsStart: 0 } };
+export const EMPTY_LEDGER: Ledger = {
+  entries: [],
+  recurring: [],
+  goals: [],
+  rules: [],
+  checkpoints: [],
+  customCategories: [],
+  categoryBudgets: {},
+  settings: { monthlyBudget: 0, savingsStart: 0 },
+};
 
 export type Category = { id: string; label: string; emoji: string };
+export type CustomCategory = Category & { kind: Kind };
+export type Categories = Record<Kind, Category[]>;
 
-export const CATEGORIES: Record<Kind, Category[]> = {
+/** Kinds the user can add categories to (pockets and debts have fixed meanings). */
+export const CUSTOMIZABLE_KINDS = ["expense", "charge", "income"] as const satisfies Kind[];
+
+/** Built-in categories; use categoriesOf(ledger) to include the user's own. */
+export const CATEGORIES: Categories = {
   expense: [
     { id: "resto", label: "Restau & fast-food", emoji: "🍔" },
     { id: "sorties", label: "Sorties", emoji: "🍻" },
@@ -83,6 +125,7 @@ export const CATEGORIES: Record<Kind, Category[]> = {
   ],
   income: [
     { id: "salaire", label: "Salaire", emoji: "💼" },
+    { id: "aides", label: "Aides & allocations", emoji: "🏛️" },
     { id: "freelance", label: "Freelance", emoji: "🧑‍💻" },
     { id: "revente", label: "Revente", emoji: "🏷️" },
     { id: "cadeau", label: "Cadeau", emoji: "🎁" },
@@ -101,6 +144,9 @@ export const CATEGORIES: Record<Kind, Category[]> = {
     { id: "courses", label: "Courses (supermarché)", emoji: "🛒" },
     { id: "sante", label: "Santé", emoji: "💊" },
     { id: "impots", label: "Impôts", emoji: "🧾" },
+    { id: "sport", label: "Salle de sport", emoji: "🏋️" },
+    { id: "maison", label: "Maison & entretien", emoji: "🔧" },
+    { id: "banque", label: "Banque", emoji: "🏦" },
     { id: "autre", label: "Autre", emoji: "📎" },
   ],
   savings: [
@@ -147,24 +193,35 @@ export function debtBalances(entries: Entry[]): DebtBalance[] {
     .sort((a, b) => b.iOwe + b.owesMe - (a.iOwe + a.owesMe));
 }
 
-/** Effect on the savings account: a deposit is positive, a withdrawal negative, anything else 0. */
-export const savingsDelta = (entry: Movement) => (entry.kind !== "savings" ? 0 : entry.category === "retrait" ? -entry.amount : entry.amount);
+/** Effect on the livret: a deposit is positive, a withdrawal negative, anything else 0. */
+export const savingsDelta = (entry: Movement) =>
+  entry.kind !== "savings" ? 0 : entry.category === "depot" ? entry.amount : entry.category === "retrait" ? -entry.amount : 0;
 
-export function getCategory(kind: Kind, id: string): Category {
-  const list = CATEGORIES[kind];
+
+/** Built-in categories plus the user's, inserted before "Autre" (always last). */
+export function categoriesOf(ledger: Pick<Ledger, "customCategories">): Categories {
+  const result = structuredClone(CATEGORIES);
+  for (const custom of ledger.customCategories) {
+    const list = result[custom.kind];
+    list.splice(list.length - 1, 0, { id: custom.id, label: custom.label, emoji: custom.emoji });
+  }
+  return result;
+}
+
+export function getCategory(kind: Kind, id: string, categories: Categories = CATEGORIES): Category {
+  const list = categories[kind];
   return list.find((c) => c.id === id) ?? list[list.length - 1];
 }
 
 // --- Amounts ---
 
 const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
-const eurosRound = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
-/** 123456 -> "1 234,56 €". `round` drops the cents (for big headline numbers). */
-export const formatMoney = (cents: Cents, round = false) => (round ? eurosRound : euros).format(cents / 100);
+/** 123456 -> "1 234,56 €". Always with the cents: amounts are never rounded. */
+export const formatMoney = (cents: Cents) => euros.format(cents / 100);
 
-/** Same with an explicit sign: "+12 €" / "−12 €". */
-export const formatSigned = (cents: Cents, round = false) => `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${formatMoney(Math.abs(cents), round)}`;
+/** Same with an explicit sign: "+12,00 €" / "−12,00 €". */
+export const formatSigned = (cents: Cents) => `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${formatMoney(Math.abs(cents))}`;
 
 /** Max amount of one entry or goal: 10 M€. */
 export const MAX_AMOUNT: Cents = 1_000_000_000;
@@ -219,6 +276,10 @@ export const monthName = (month: string) => monthNames.format(new Date(Number(mo
 /** "2026-10" -> "oct.". */
 export const monthShortName = (month: string) => monthShort.format(new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1));
 
+const longDay = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+/** "2026-10-27" -> "mardi 27 octobre 2026". */
+export const formatDay = (date: string) => longDay.format(new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8))));
+
 const weekdayShort = new Intl.DateTimeFormat("fr-FR", { weekday: "short" });
 
 /** "2026-10-27" -> { day: "27", weekday: "mar." }. */
@@ -238,15 +299,19 @@ export type MonthStats = {
   spent: Cents;
   regret: Cents;
   charges: Cents;
-  /** Net transfers to the savings account (deposits - withdrawals). */
+  /** Net transfers to the livret (deposits - withdrawals). */
   saved: Cents;
   /** Savings account balance at the end of the month. */
   savingsBalance: Cents;
   /** Effect of debts on the current account (repaid, advanced, received back). */
   debtFlow: Cents;
-  /** Left on the current account: income - charges - spent - saved + debtFlow. */
+  /** What was kept of the month's income, wherever it went: income - charges - spent + debtFlow. */
+  kept: Cents;
+  /** The part of `kept` left on the current account: kept - saved (not the account balance). */
   left: Cents;
-  /** Share of the income put on the savings account, null without income. */
+  /** Real current-account balance at the end of the month, null without any balance checkpoint. */
+  accountBalance: Cents | null;
+  /** Share of the income put on the livret, null without income. */
   savingsRate: number | null;
   budget: Cents;
   byCategory: CategoryTotal[];
@@ -258,11 +323,11 @@ export type MonthStats = {
   biggest?: Entry;
 };
 
-function totals(entries: Entry[], kind: Kind): CategoryTotal[] {
+function totals(entries: Entry[], kind: Kind, categories: Categories): CategoryTotal[] {
   const map = new Map<string, CategoryTotal>();
   for (const entry of entries) {
     if (entry.kind !== kind) continue;
-    const category = getCategory(kind, entry.category);
+    const category = getCategory(kind, entry.category, categories);
     const current = map.get(category.id) ?? { category, total: 0, count: 0 };
     map.set(category.id, { ...current, total: current.total + entry.amount, count: current.count + 1 });
   }
@@ -275,15 +340,18 @@ const sum = (entries: Entry[], kind: Kind) => entries.reduce((n, e) => (e.kind =
 export const byDateDesc = (a: Entry, b: Entry) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt);
 
 export function monthStats(ledger: Ledger, month: string): MonthStats {
+  const categories = categoriesOf(ledger);
   const entries = ledger.entries.filter((e) => monthOf(e.date) === month).sort(byDateDesc);
   const income = sum(entries, "income");
   const spent = sum(entries, "expense");
   const charges = sum(entries, "charge");
   const saved = entries.reduce((n, e) => n + savingsDelta(e), 0);
   const debtFlow = entries.reduce((n, e) => (e.kind === "debt" ? n + signedAmount(e) : n), 0);
-  const left = income - charges - spent - saved + debtFlow;
-  const savingsBalance =
-    ledger.settings.savingsStart + ledger.entries.reduce((n, e) => (monthOf(e.date) <= month ? n + savingsDelta(e) : n), 0);
+  const kept = income - charges - spent + debtFlow;
+  const left = kept - saved;
+  const upToMonth = ledger.entries.filter((e) => monthOf(e.date) <= month);
+  const savingsBalance = ledger.settings.savingsStart + upToMonth.reduce((n, e) => n + savingsDelta(e), 0);
+  const accountBalance = accountBalanceAt(ledger, `${month}-${String(daysInMonth(month)).padStart(2, "0")}`);
 
   const perDay = Array.from({ length: daysInMonth(month) }, () => 0);
   for (const e of entries) if (e.kind === "expense") perDay[Number(e.date.slice(8)) - 1] += e.amount;
@@ -300,16 +368,43 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
     charges,
     saved,
     savingsBalance,
+    accountBalance,
     debtFlow,
+    kept,
     left,
     savingsRate: income > 0 ? saved / income : null,
     budget: ledger.settings.monthlyBudget,
-    byCategory: totals(entries, "expense"),
-    incomeByCategory: totals(entries, "income"),
-    chargesByCategory: totals(entries, "charge"),
+    byCategory: totals(entries, "expense", categories),
+    incomeByCategory: totals(entries, "income", categories),
+    chargesByCategory: totals(entries, "charge", categories),
     cumulative,
     biggest: expenses.reduce<Entry | undefined>((best, e) => (!best || e.amount > best.amount ? e : best), undefined),
   };
+}
+
+/** Day-by-day running totals of a month (index 0 = day 1), for the comparison chart. */
+export type MonthDaily = { month: string; plaisir: Cents[]; charges: Cents[]; depenses: Cents[]; garde: Cents[] };
+
+export function monthDaily(ledger: Ledger, month: string): MonthDaily {
+  const days = daysInMonth(month);
+  const plaisir = Array.from({ length: days }, () => 0);
+  const charges = Array.from({ length: days }, () => 0);
+  const garde = Array.from({ length: days }, () => 0);
+  for (const e of ledger.entries) {
+    if (monthOf(e.date) !== month) continue;
+    const day = Number(e.date.slice(8)) - 1;
+    if (e.kind === "expense") plaisir[day] += e.amount;
+    if (e.kind === "charge") charges[day] += e.amount;
+    // Kept = income - charges - plaisir ± debts (savings transfers move money, they do not spend it).
+    if (e.kind !== "savings") garde[day] += signedAmount(e);
+  }
+  const running = (values: Cents[]) => {
+    let total = 0;
+    return values.map((v) => (total += v));
+  };
+  const p = running(plaisir);
+  const c = running(charges);
+  return { month, plaisir: p, charges: c, depenses: p.map((v, i) => v + c[i]), garde: running(garde) };
 }
 
 export type YearStats = {
@@ -320,6 +415,7 @@ export type YearStats = {
   charges: Cents;
   saved: Cents;
   regret: Cents;
+  kept: Cents;
   left: Cents;
   byCategory: CategoryTotal[];
   chargesByCategory: CategoryTotal[];
@@ -335,9 +431,10 @@ export function yearStats(ledger: Ledger, year: number): YearStats {
     charges: months.reduce((n, m) => n + m.charges, 0),
     saved: months.reduce((n, m) => n + m.saved, 0),
     regret: months.reduce((n, m) => n + m.regret, 0),
+    kept: months.reduce((n, m) => n + m.kept, 0),
     left: months.reduce((n, m) => n + m.left, 0),
-    byCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "expense"),
-    chargesByCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "charge"),
+    byCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "expense", categoriesOf(ledger)),
+    chargesByCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "charge", categoriesOf(ledger)),
   };
 }
 
@@ -347,6 +444,38 @@ export const pendingRecurring = (ledger: Ledger, month: string) =>
 
 /** Savings account balance today. */
 export const savingsBalance = (ledger: Ledger): Cents => ledger.settings.savingsStart + ledger.entries.reduce((n, e) => n + savingsDelta(e), 0);
+
+/** The day an entry hits the account balance: the bank's booking day when known, else the payment day. */
+const balanceDate = (e: Entry) => e.bookedDate ?? e.date;
+
+/** Sum of the effects on the current account of the entries booked in (from, to]. */
+const flowBetween = (entries: Entry[], from: string, to: string) =>
+  entries.reduce((n, e) => (balanceDate(e) > from && balanceDate(e) <= to ? n + signedAmount(e) : n), 0);
+
+/**
+ * Current-account balance at the end of `date`, from the closest checkpoint (the last one on or before `date`,
+ * else the first one after): operations in between are added or taken back. Null without any checkpoint.
+ */
+export function accountBalanceAt(ledger: Ledger, date: string): Cents | null {
+  const sorted = [...ledger.checkpoints].sort((a, b) => a.date.localeCompare(b.date));
+  const anchor = sorted.findLast((c) => c.date <= date) ?? sorted[0];
+  if (!anchor) return null;
+  return anchor.date <= date ? anchor.balance + flowBetween(ledger.entries, anchor.date, date) : anchor.balance - flowBetween(ledger.entries, date, anchor.date);
+}
+
+/**
+ * Each checkpoint compared with the previous one: the balance expected from the operations in between, and the gap
+ * with the real balance (a missing or duplicated operation). The first checkpoint has nothing to compare with.
+ */
+export function checkpointChecks(ledger: Ledger): { checkpoint: Checkpoint; expected: Cents | null; gap: Cents | null }[] {
+  const sorted = [...ledger.checkpoints].sort((a, b) => a.date.localeCompare(b.date));
+  return sorted.map((checkpoint, i) => {
+    const previous = sorted[i - 1];
+    if (!previous) return { checkpoint, expected: null, gap: null };
+    const expected = previous.balance + flowBetween(ledger.entries, previous.date, checkpoint.date);
+    return { checkpoint, expected, gap: checkpoint.balance - expected };
+  });
+}
 
 /** Savings account money not assigned to a goal yet (negative when the goals ask for more than the livret holds). */
 export const freeMoney = (ledger: Ledger): Cents => savingsBalance(ledger) - ledger.goals.reduce((n, g) => n + g.saved, 0);

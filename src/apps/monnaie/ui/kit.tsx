@@ -10,8 +10,10 @@ export const BASE = "/apps/monnaie";
 
 const NAV = [
   { key: "mois", label: "Ce mois", href: BASE },
+  { key: "operations", label: "Opérations", href: `${BASE}/operations` },
   { key: "annee", label: "L'année", href: `${BASE}/annee` },
   { key: "objectifs", label: "Objectifs", href: `${BASE}/objectifs` },
+  { key: "import", label: "Import", href: `${BASE}/import` },
   { key: "reglages", label: "Réglages", href: `${BASE}/reglages` },
 ] as const;
 
@@ -57,9 +59,9 @@ export function Paper({ children, tilt: deg = 0, className = "" }: { children: R
 }
 
 /** Calmer dark panel, cut like the paper but still. */
-export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Panel({ children, className = "", id }: { children: ReactNode; className?: string; id?: string }) {
   return (
-    <section className={`mn-shape p-6 sm:p-8 ${className}`} style={{ "--mn-shape": "var(--mn-panel)" } as CSSProperties}>
+    <section id={id} className={`mn-shape p-6 sm:p-8 ${className}`} style={{ "--mn-shape": "var(--mn-panel)" } as CSSProperties}>
       {children}
     </section>
   );

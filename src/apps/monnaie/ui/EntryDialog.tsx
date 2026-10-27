@@ -2,10 +2,10 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { isTyping, playSound } from "@/components/console/sound";
-import { amountInput, CATEGORIES, type Entry, type Kind } from "../money";
+import { amountInput, type Categories, type Entry, type Kind } from "../money";
 
-const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Livret…", debt: "Dette…" };
-const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Livret", debt: "Dette", income: "Revenu" };
+const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Épargne…", debt: "Dette…" };
+const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Épargne", debt: "Dette", income: "Revenu" };
 const PLACEHOLDERS: Record<Kind, string> = {
   expense: "Burger du vendredi",
   charge: "Loyer d'octobre",
@@ -28,7 +28,13 @@ export function EntryDialog({
   trigger,
   hotkey = false,
   people = [],
+  categories,
+  sameLabel = 0,
 }: {
+  /** Lines with the same label (this one included): offers to reclassify them all. */
+  sameLabel?: number;
+  /** Built-in and user categories (categoriesOf(ledger)). */
+  categories: Categories;
   defaultDate: string;
   entry?: Entry;
   trigger?: ReactNode;
@@ -99,7 +105,7 @@ export function EntryDialog({
             <div className="grid grid-cols-[1fr_auto] gap-3">
               <label className={labelClass}>
                 Quoi
-                <input name="label" required maxLength={80} defaultValue={entry?.label} placeholder={PLACEHOLDERS[kind]} />
+                <input name="label" required maxLength={80} defaultValue={entry?.label} placeholder={PLACEHOLDERS[kind]} className="uppercase" />
               </label>
               <label className={labelClass}>
                 Montant €
@@ -122,7 +128,7 @@ export function EntryDialog({
             <fieldset className="grid gap-2">
               <legend className={`${labelClass} mb-1.5`}>Catégorie</legend>
               <div className="flex flex-wrap gap-2">
-                {CATEGORIES[kind].map((c, i) => (
+                {categories[kind].map((c, i) => (
                   <label key={`${kind}-${c.id}`} className="cursor-pointer">
                     <input
                       type="radio"
@@ -155,6 +161,15 @@ export function EntryDialog({
               <label className="flex cursor-pointer items-center gap-3 text-sm font-bold">
                 <input type="checkbox" name="regret" defaultChecked={entry?.regret} className="h-5 w-5 accent-[var(--mn-ink)]" />
                 Je regrette déjà 😬
+              </label>
+            )}
+            {entry && sameLabel > 1 && (kind === "expense" || kind === "charge" || kind === "income") && (
+              <label className="flex cursor-pointer items-start gap-3 border-2 border-dashed border-[var(--mn-ink)] p-3 text-sm font-bold">
+                <input type="checkbox" name="applyAll" className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--mn-accent)]" />
+                <span>
+                  Appliquer ce type et cette catégorie aux {sameLabel} lignes « {entry.label} »
+                  <span className="block font-semibold text-zinc-500">et aux prochains imports</span>
+                </span>
               </label>
             )}
 

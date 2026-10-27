@@ -1,100 +1,71 @@
 import type { CSSProperties } from "react";
 import { formatMoney, monthShortName, type Cents, type CategoryTotal, type MonthStats } from "../money";
 
-/** Spending gauge against the monthly budget, with the ideal pace for today. */
-export function BudgetGauge({ spent, budget, pace }: { spent: Cents; budget: Cents; pace?: number }) {
-  const ratio = budget ? spent / budget : 0;
-  const over = ratio > 1;
-  return (
-    <div>
-      <div className="relative h-9 border-[3px] border-[var(--mn-ink)] bg-zinc-100">
-        <div
-          className="mn-grow h-full"
-          style={{ width: `${Math.min(ratio, 1) * 100}%`, background: over ? "var(--mn-red)" : "var(--mn-accent)" }}
-        />
-        {pace !== undefined && (
-          <div className="absolute inset-y-[-8px] w-[3px] bg-[var(--mn-ink)]" style={{ left: `${pace * 100}%` }} title="Rythme idéal aujourd'hui">
-            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider">auj.</span>
-          </div>
-        )}
-      </div>
-      <div className="mt-2 flex justify-between text-sm font-semibold text-zinc-500">
-        <span>{Math.round(ratio * 100)} % du budget</span>
-        <span>{formatMoney(budget, true)}</span>
-      </div>
-    </div>
-  );
-}
-
-/** Cumulative spending of the month, day by day, against a straight budget line. */
-export function SpendingCurve({ stats, today }: { stats: MonthStats; today?: number }) {
-  const days = stats.cumulative.length;
-  const shown = today ? stats.cumulative.slice(0, today) : stats.cumulative;
-  const max = Math.max(stats.budget, stats.cumulative[days - 1] ?? 0, 1);
-  const W = 600;
-  const H = 220;
-  const x = (day: number) => (day / (days - 1 || 1)) * W;
-  const y = (cents: number) => H - (cents / max) * H;
-  const line = shown.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
-  const area = shown.length ? `${line}L${x(shown.length - 1).toFixed(1)},${H}L0,${H}Z` : "";
-  return (
-    <figure>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-56 w-full overflow-visible" role="img" aria-label="Dépenses cumulées du mois">
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} stroke="rgba(255,255,255,0.06)" vectorEffect="non-scaling-stroke" />
-        ))}
-        {stats.budget > 0 && (
-          <line x1="0" y1={H} x2={W} y2={y(stats.budget)} stroke="#6b6c75" strokeWidth="2" strokeDasharray="6 6" vectorEffect="non-scaling-stroke" />
-        )}
-        {area && <path d={area} fill="rgba(255,122,47,0.16)" />}
-        {line && <path d={line} fill="none" stroke="var(--mn-accent)" strokeWidth="3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
-      </svg>
-      <figcaption className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-zinc-400">
-        <span className="flex items-center gap-2">
-          <span className="h-1 w-5 bg-[var(--mn-accent)]" /> Cramé cumulé
-        </span>
-        {stats.budget > 0 && (
-          <span className="flex items-center gap-2">
-            <span className="h-0 w-5 border-t-2 border-dashed border-zinc-500" /> Rythme du budget
-          </span>
-        )}
-        <span className="ml-auto">jour 1 → {days}</span>
-      </figcaption>
-    </figure>
-  );
-}
-
-/** One row per category, the biggest in lime. */
-export function CategoryBars({ totals, dark = false }: { totals: CategoryTotal[]; dark?: boolean }) {
-  const max = totals[0]?.total ?? 1;
+/**
+ * One row per category, the biggest in the accent color. Optional per-category `budgets` (a white marker, the bar turns
+ * red past it) and `averages` (usual monthly amount: shows the gap, e.g. "+38 % vs moy.").
+ */
+export function CategoryBars({
+  totals,
+  dark = false,
+  budgets = {},
+  averages,
+}: {
+  totals: CategoryTotal[];
+  dark?: boolean;
+  budgets?: Record<string, Cents>;
+  averages?: Map<string, Cents>;
+}) {
+  const max = Math.max(totals[0]?.total ?? 1, ...totals.map((t) => budgets[t.category.id] ?? 0), 1);
   const all = totals.reduce((n, t) => n + t.total, 0) || 1;
   return (
     <ul className="grid gap-4">
-      {totals.map((t, i) => (
-        <li key={t.category.id}>
-          <div className="mb-1.5 flex items-baseline justify-between gap-3">
-            <span className="mn-punch text-lg">
-              <span className="mr-2 not-italic">{t.category.emoji}</span>
-              {t.category.label}
-            </span>
-            <span className={`text-sm font-bold ${dark ? "text-zinc-300" : "text-zinc-600"}`}>
-              {formatMoney(t.total)} · {Math.round((t.total / all) * 100)} %
-            </span>
-          </div>
-          <div className={`h-3 ${dark ? "bg-black/30" : "bg-zinc-100"}`}>
-            <div
-              className="mn-grow h-full"
-              style={{ width: `${(t.total / max) * 100}%`, background: i === 0 ? "var(--mn-accent)" : dark ? "#6b6e85" : "#3a3b44", animationDelay: `${i * 60}ms` } as CSSProperties}
-            />
-          </div>
-        </li>
-      ))}
+      {totals.map((t, i) => {
+        const budget = budgets[t.category.id];
+        const over = budget !== undefined && t.total > budget;
+        const average = averages?.get(t.category.id);
+        // Only against a meaningful habit (10 € a month or more): 75 € vs 1,67 € is not a trend.
+        const gap = average && average >= 1000 ? (t.total - average) / average : null;
+        return (
+          <li key={t.category.id}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <span className="mn-punch text-lg">
+                <span className="mr-2 not-italic">{t.category.emoji}</span>
+                {t.category.label}
+              </span>
+              <span className={`text-right text-sm font-bold ${dark ? "text-zinc-300" : "text-zinc-600"}`}>
+                {formatMoney(t.total)}
+                {budget !== undefined ? ` / ${formatMoney(budget)}` : ` · ${Math.round((t.total / all) * 100)} %`}
+                {gap !== null && Math.abs(gap) >= 0.1 && (
+                  <span className={`ml-2 ${gap > 0 ? "text-[var(--mn-red)]" : "text-emerald-400"}`} title={`Moyenne des 3 mois précédents : ${formatMoney(average!)}`}>
+                    {gap > 0 ? "+" : "−"}
+                    {Math.round(Math.abs(gap) * 100)} % vs moy.
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className={`relative h-3 ${dark ? "bg-black/30" : "bg-zinc-100"}`}>
+              <div
+                className="mn-grow h-full"
+                style={{
+                  width: `${(t.total / max) * 100}%`,
+                  background: over ? "var(--mn-red)" : i === 0 ? "var(--mn-accent)" : dark ? "#6b6e85" : "#3a3b44",
+                  animationDelay: `${i * 60}ms`,
+                } as CSSProperties}
+              />
+              {budget !== undefined && (
+                <span className="absolute -bottom-1 -top-1 w-[3px] bg-white" style={{ left: `${(budget / max) * 100}%` }} title={`Budget ${formatMoney(budget)}`} />
+              )}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
 /**
- * 12 months: income bar, and an outflow bar stacked with charges, plaisir and what went to the livret.
+ * 12 months: income bar, and an outflow bar stacked with charges, plaisir and what was put aside.
  * The dotted line is the livret balance at the end of each month.
  */
 export function YearChart({ months, current }: { months: MonthStats[]; current?: string }) {
@@ -157,7 +128,7 @@ export function YearChart({ months, current }: { months: MonthStats[]; current?:
           <span className="h-3 w-3 bg-[var(--mn-accent)]" /> Cramé (plaisir)
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 bg-[var(--mn-yellow)]" /> Mis sur le livret
+          <span className="h-3 w-3 bg-[var(--mn-yellow)]" /> Mis de côté
         </span>
         <span className="flex items-center gap-2">
           <span className="h-0 w-5 border-t-[3px] border-dotted border-[var(--mn-yellow)]" /> Solde du livret

@@ -125,6 +125,8 @@ Montants en **centimes** (entiers).
 | DELETE | `/entries/:id` | Supprime une ligne |
 | GET | `/months/:month` | Bilan du mois : encaissé, charges, cramé, livret (net et solde), reste, budget, par catégorie |
 | GET | `/export.csv` | Toutes les lignes en CSV |
+| GET | `/backup.json` | Sauvegarde complète, à restaurer depuis les Réglages |
+| POST | `/import` (`?dryRun=1`) | Importe un export CSV Caisse d'Épargne (corps brut) : règles apprises puis catégories de la banque, opérations déjà importées sautées |
 
 ## Déploiement (Coolify)
 
@@ -169,7 +171,13 @@ Suivi de l'argent : ce que je gagne, mes charges (loyer, énergie, assurances…
 | `money.ts` | Types, catégories, montants, calcul des stats (pur, sans I/O) |
 | `server/store.ts` | Stockage dans `data/monnaie/ledger.json`, validation des entrées |
 | `server/actions.ts` | Server Actions des formulaires |
-| `ui/` | Écrans : mois, année, objectifs, réglages ; DA dans `ui/monnaie.css` |
+| `import/` | Lecture des exports bancaires et suggestions de catégorie |
+| `ui/` | Écrans : mois, année, objectifs, import, réglages ; DA dans `ui/monnaie.css` |
 
-- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/annee/AAAA`, `/objectifs`, `/reglages`.
+- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/operations` (recherche et filtres), `/annee/AAAA`, `/objectifs`, `/import`, `/reglages`.
+- **Import bancaire** (`import/`) : `caisse-epargne.ts` lit l'export CSV, `suggest.ts` propose type et catégorie (règles apprises, puis catégories de la banque). Chaque opération a un `importId` stable : réimporter une période ne crée pas de doublon. Corriger une ligne à l'import crée une règle (gérées dans les Réglages).
+- **Épargne** : le livret, avec son solde de départ dans les Réglages. Revolut est traité comme une dépense ou un revenu (catégorie « Revolut »).
+- **Analyses** (`insights.ts`) : ce qui revient chaque mois (même libellé, 3 mois sur 6, montant stable), prévision du solde au 31, moyenne de chaque catégorie sur les 3 mois précédents.
+- **Pointages du solde** : le solde réel saisi à une date ; le solde de chaque mois en découle, et chaque pointage est comparé au précédent pour repérer une opération manquante.
+- **Catégories perso** et **budgets par catégorie** dans les Réglages ; une ligne peut reclasser toutes celles du même libellé (et créer une règle d'import).
 - **Raccourci** : X ouvre l'ajout d'une ligne.

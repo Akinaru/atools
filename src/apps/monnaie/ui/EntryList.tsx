@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { dayParts, formatSigned, getCategory, monthShortName, savingsDelta, signedAmount, type Entry, type Kind } from "../money";
+import { dayParts, formatSigned, getCategory, monthShortName, savingsDelta, signedAmount, type Categories, type Entry, type Kind } from "../money";
 import { flipRegret, removeEntry } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { squareClass } from "./kit";
@@ -21,7 +21,7 @@ const AMOUNT: Record<Kind, string> = {
 };
 
 /** Entries of a month, grouped by day, newest first: a big date on the left, one ticket per entry. */
-export function EntryList({ entries }: { entries: Entry[] }) {
+export function EntryList({ entries, categories, labelCounts = {} }: { entries: Entry[]; categories: Categories; labelCounts?: Record<string, number> }) {
   const days = new Map<string, Entry[]>();
   for (const entry of entries) days.set(entry.date, [...(days.get(entry.date) ?? []), entry]);
 
@@ -39,12 +39,12 @@ export function EntryList({ entries }: { entries: Entry[] }) {
                 <span className="text-xs font-bold uppercase tracking-wider text-[var(--mn-muted)]">
                   {weekday} {monthShortName(date.slice(0, 7))}
                 </span>
-                <span className={`mn-punch text-lg ${total < 0 ? "text-[var(--mn-accent)]" : "text-white"}`}>{formatSigned(total, true)}</span>
+                <span className={`mn-punch text-lg ${total < 0 ? "text-[var(--mn-accent)]" : "text-white"}`}>{formatSigned(total)}</span>
               </span>
             </header>
             <ul className="grid content-start gap-3">
               {list.map((entry) => (
-                <EntryRow key={entry.id} entry={entry} tilt={row++ % 2 ? 0.35 : -0.35} />
+                <EntryRow key={entry.id} entry={entry} categories={categories} sameLabel={labelCounts[entry.label] ?? 1} tilt={row++ % 2 ? 0.35 : -0.35} />
               ))}
             </ul>
           </section>
@@ -55,11 +55,16 @@ export function EntryList({ entries }: { entries: Entry[] }) {
 }
 
 /** One entry as a slightly tilted ticket: sticker, label, amount; actions show on hover. */
-function EntryRow({ entry, tilt }: { entry: Entry; tilt: number }) {
-  const category = getCategory(entry.kind, entry.category);
-  // A livret transfer shows its effect on the livret (+ deposit, − withdrawal), an IOU its amount;
+function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; categories: Categories; sameLabel: number; tilt: number }) {
+  const category = getCategory(entry.kind, entry.category, categories);
+  // A savings transfer shows its effect on its pocket (+ put aside, − taken back), an IOU its amount;
   // the rest, its effect on the current account.
-  const amount = entry.kind === "savings" ? savingsDelta(entry) : entry.kind === "debt" && entry.category === "dette" ? entry.amount : signedAmount(entry);
+  const amount =
+    entry.kind === "savings"
+      ? savingsDelta(entry)
+      : entry.kind === "debt" && entry.category === "dette"
+        ? entry.amount
+        : signedAmount(entry);
   return (
     <li
       className="mn-shape group flex items-center gap-4 py-3 pl-3 pr-4 drop-shadow-[0.3rem_0.35rem_0_rgba(0,0,0,0.45)] transition-transform duration-150 [transform:rotate(var(--mn-tilt))] hover:[transform:translateY(-2px)_rotate(0deg)] sm:pl-4"
@@ -73,6 +78,8 @@ function EntryRow({ entry, tilt }: { entry: Entry; tilt: number }) {
       </span>
 
       <EntryDialog
+        categories={categories}
+        sameLabel={sameLabel}
         defaultDate={entry.date}
         entry={entry}
         trigger={
