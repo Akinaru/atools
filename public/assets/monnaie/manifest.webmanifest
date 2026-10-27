@@ -1,0 +1,18 @@
+{
+  "id": "/apps/monnaie",
+  "name": "Monnaie",
+  "short_name": "Monnaie",
+  "description": "Ce que je gagne, ce que je crame pour le plaisir, et ce qu'il me reste. Mois par mois.",
+  "lang": "fr",
+  "start_url": "/apps/monnaie",
+  "scope": "/apps/monnaie",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15161f",
+  "theme_color": "#15161f",
+  "icons": [
+    { "src": "/assets/monnaie/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/monnaie/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/monnaie/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

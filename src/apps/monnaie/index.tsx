@@ -40,6 +40,7 @@ const app: App = {
   accent: "linear-gradient(135deg, #11121a, #272935 60%, #ff7a2f)",
   Page,
   api,
+  pwa: { manifest: "/assets/monnaie/manifest.webmanifest", appleIcon: "/assets/monnaie/apple-touch-icon.png" },
 };
 
 export default app;

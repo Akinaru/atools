@@ -24,4 +24,9 @@ export type App = {
   url?: string;
   /** Optional API routes, served at /api/<slug>/<route path> and protected by the API key. */
   api?: ApiRoute[];
+  /**
+   * Installable on its own (PWA): its pages link this web app manifest and icon. Both live in public/ (under
+   * /assets/, which the login wall lets through, so the browser can fetch them).
+   */
+  pwa?: { manifest: string; appleIcon: string };
 };

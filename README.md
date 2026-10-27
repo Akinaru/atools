@@ -45,6 +45,7 @@ L'app apparaît sur l'accueil, avec son UI sur `/apps/mon-app` et son API sur `/
 | `Page({ path })` | Composant serveur. `/apps/mon-app/a/b` donne `path = ["a", "b"]` |
 | `url` | App externe, sans `Page` : la tuile ouvre cette URL dans un nouvel onglet (ex. `src/apps/aarchive`) |
 | `api` | Liste de routes `{ method, path: "items/:id", description, handler }` |
+| `pwa` | App installable seule (PWA) : `{ manifest, appleIcon }`, fichiers dans `public/assets/<slug>/` (ex. `src/apps/monnaie`) |
 
 - Fichiers : `appDataDir(slug, ...)` de `src/lib/storage.ts`.
 - Helpers d'API : `json()` et `apiError()` de `src/lib/api.ts`.
