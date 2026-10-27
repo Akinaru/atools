@@ -3,16 +3,38 @@
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { isTyping, playSound } from "@/components/console/sound";
 import { amountInput, CATEGORIES, type Entry, type Kind } from "../money";
+
+const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Livret…", debt: "Dette…" };
+const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Livret", debt: "Dette", income: "Revenu" };
+const PLACEHOLDERS: Record<Kind, string> = {
+  expense: "Burger du vendredi",
+  charge: "Loyer d'octobre",
+  income: "Salaire d'octobre",
+  savings: "Virement livret A",
+  debt: "Place de concert",
+};
 import { saveEntry } from "../server/actions";
 import { buttonClass, squareClass } from "./kit";
 
 const labelClass = "grid gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-500";
 
 /**
- * Add (or edit, with `entry`) an income or an expense. The add button also opens with the X key.
- * `trigger` replaces the default button.
+ * Add (or edit, with `entry`) a line of any kind. The add button also opens with the X key.
+ * `trigger` replaces the default button; `people` feeds the name suggestions of debts.
  */
-export function EntryDialog({ defaultDate, entry, trigger, hotkey = false }: { defaultDate: string; entry?: Entry; trigger?: ReactNode; hotkey?: boolean }) {
+export function EntryDialog({
+  defaultDate,
+  entry,
+  trigger,
+  hotkey = false,
+  people = [],
+}: {
+  defaultDate: string;
+  entry?: Entry;
+  trigger?: ReactNode;
+  hotkey?: boolean;
+  people?: string[];
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(saveEntry, {});
@@ -58,18 +80,18 @@ export function EntryDialog({ defaultDate, entry, trigger, hotkey = false }: { d
           <form ref={form} action={action} className="grid gap-5">
             {entry && <input type="hidden" name="id" value={entry.id} />}
             <div className="flex items-start justify-between">
-              <h2 className="mn-punch text-5xl">{entry ? "Modifier" : kind === "expense" ? "J'ai cramé…" : "J'ai encaissé…"}</h2>
+              <h2 className="mn-punch text-5xl">{entry ? "Modifier" : TITLES[kind]}</h2>
               <button type="button" onClick={() => dialog.current?.close()} className={squareClass(true)} aria-label="Fermer">
                 ✕
               </button>
             </div>
 
-            <fieldset className="grid grid-cols-2 border-[3px] border-[var(--mn-ink)]">
+            <fieldset className="grid grid-cols-5 border-[3px] border-[var(--mn-ink)]">
               <legend className="sr-only">Type</legend>
-              {(["expense", "income"] as const).map((k) => (
-                <label key={k} className={`mn-punch cursor-pointer py-3 text-center text-lg ${kind === k ? "bg-[var(--mn-ink)] text-[var(--mn-accent)]" : ""}`}>
+              {(Object.keys(TABS) as Kind[]).map((k) => (
+                <label key={k} className={`mn-punch cursor-pointer px-1 py-3 text-center text-sm sm:text-base ${kind === k ? "bg-[var(--mn-ink)] text-[var(--mn-accent)]" : ""}`}>
                   <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="sr-only" />
-                  {k === "expense" ? "Dépense plaisir" : "Revenu"}
+                  {TABS[k]}
                 </label>
               ))}
             </fieldset>
@@ -77,13 +99,25 @@ export function EntryDialog({ defaultDate, entry, trigger, hotkey = false }: { d
             <div className="grid grid-cols-[1fr_auto] gap-3">
               <label className={labelClass}>
                 Quoi
-                <input name="label" required maxLength={80} defaultValue={entry?.label} placeholder={kind === "expense" ? "Burger du vendredi" : "Salaire d'octobre"} />
+                <input name="label" required maxLength={80} defaultValue={entry?.label} placeholder={PLACEHOLDERS[kind]} />
               </label>
               <label className={labelClass}>
                 Montant €
                 <input name="amount" required inputMode="decimal" defaultValue={entry ? amountInput(entry.amount) : ""} placeholder="12,50" className="w-32" />
               </label>
             </div>
+
+            {kind === "debt" && (
+              <label className={labelClass}>
+                Avec qui
+                <input name="person" required maxLength={60} defaultValue={entry?.person} placeholder="Julien" list="mn-people" autoComplete="off" />
+                <datalist id="mn-people">
+                  {people.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </label>
+            )}
 
             <fieldset className="grid gap-2">
               <legend className={`${labelClass} mb-1.5`}>Catégorie</legend>

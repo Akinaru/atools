@@ -121,9 +121,9 @@ Montants en **centimes** (entiers).
 | Méthode | Route | Rôle |
 | --- | --- | --- |
 | GET | `/entries` (`?month=AAAA-MM`, `?kind=income\|expense`) | Lignes, les plus récentes d'abord |
-| POST | `/entries` | Ajoute une ligne : `{ kind, amount, label, category, date, note?, regret? }` |
+| POST | `/entries` | Ajoute une ligne : `{ kind, amount, label, category, date, note?, regret? }`. `kind` : `income`, `expense` (plaisir), `charge` (loyer, énergie…) `savings` (livret, `category` = `depot` ou `retrait`) ou `debt` (`person` requis, `category` = `dette`, `rembourse`, `pret` ou `recu`) |
 | DELETE | `/entries/:id` | Supprime une ligne |
-| GET | `/months/:month` | Bilan du mois : encaissé, cramé, reste, budget, par catégorie |
+| GET | `/months/:month` | Bilan du mois : encaissé, charges, cramé, livret (net et solde), reste, budget, par catégorie |
 | GET | `/export.csv` | Toutes les lignes en CSV |
 
 ## Déploiement (Coolify)
@@ -162,7 +162,7 @@ docker run -p 3000:3000 -v atools-data:/app/data -e ATOOLS_PASSWORD=… -e ATOOL
 
 ## App : Monnaie (`src/apps/monnaie`)
 
-Suivi de l'argent : ce que je gagne, ce que je dépense sans nécessité, et ce qu'il reste chaque mois.
+Suivi de l'argent : ce que je gagne, mes charges (loyer, énergie, assurances…), ce que je dépense sans nécessité, ce que je mets sur le livret chaque mois, et les dettes entre potes (l'ardoise).
 
 | Dossier / fichier | Contenu |
 | --- | --- |

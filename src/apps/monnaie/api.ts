@@ -1,5 +1,5 @@
 import { apiError, json, type ApiRoute } from "@/lib/api";
-import { byDateDesc, getCategory, MONTH_PATTERN, monthStats, type CategoryTotal, type Entry } from "./money";
+import { byDateDesc, getCategory, KIND_LABELS, MONTH_PATTERN, monthStats, signedAmount, type CategoryTotal, type Entry } from "./money";
 import { addEntry, deleteEntry, LedgerError, readLedger } from "./server/store";
 
 // API of the app, served at /api/monnaie/... Amounts are integers in cents.
@@ -14,7 +14,7 @@ export const api: ApiRoute[] = [
   {
     method: "GET",
     path: "entries",
-    description: "Lignes (revenus et dépenses), les plus récentes d'abord. Filtres : ?month=AAAA-MM, ?kind=income|expense.",
+    description: "Lignes (revenus et dépenses), les plus récentes d'abord. Filtres : ?month=AAAA-MM, ?kind=income|expense|charge|savings|debt.",
     handler: async ({ url }) => {
       const month = url.searchParams.get("month");
       const kind = url.searchParams.get("kind");
@@ -26,7 +26,7 @@ export const api: ApiRoute[] = [
   {
     method: "POST",
     path: "entries",
-    description: "Ajoute une ligne. JSON : { kind, amount (centimes), label, category, date (AAAA-MM-JJ), note?, regret? }.",
+    description: "Ajoute une ligne. JSON : { kind (income|expense|charge|savings|debt), amount (centimes), label, category, date (AAAA-MM-JJ), note?, regret?, person? }. Livret : category depot ou retrait. Dette : person requis, category dette, rembourse, pret ou recu.",
     handler: async ({ request }) => {
       let body: Record<string, unknown>;
       try {
@@ -52,7 +52,7 @@ export const api: ApiRoute[] = [
   {
     method: "GET",
     path: "months/:month",
-    description: "Bilan d'un mois : encaissé, cramé, reste, budget, par catégorie.",
+    description: "Bilan d'un mois : encaissé, charges, cramé, livret (net et solde), reste, budget, par catégorie.",
     handler: async ({ params }) => {
       if (!MONTH_PATTERN.test(params.month)) return apiError(400, "Mois invalide (AAAA-MM).");
       const stats = monthStats(await readLedger(), params.month);
@@ -62,7 +62,9 @@ export const api: ApiRoute[] = [
         income: stats.income,
         spent: stats.spent,
         regret: stats.regret,
-        fixedCosts: stats.fixedCosts,
+        charges: stats.charges,
+        saved: stats.saved,
+        savingsBalance: stats.savingsBalance,
         left: stats.left,
         savingsRate: stats.savingsRate,
         budget: stats.budget,
@@ -70,28 +72,30 @@ export const api: ApiRoute[] = [
         biggest: stats.biggest ? entryJson(stats.biggest) : null,
         byCategory: categories(stats.byCategory),
         incomeByCategory: categories(stats.incomeByCategory),
+        chargesByCategory: categories(stats.chargesByCategory),
       });
     },
   },
   {
     method: "GET",
     path: "export.csv",
-    description: "Toutes les lignes en CSV (séparateur ;, montants en euros).",
+    description: "Toutes les lignes en CSV (séparateur ;, montants en euros, effet sur le compte courant).",
     handler: async () => {
       const { entries } = await readLedger();
       const rows = [...entries].sort(byDateDesc).map((e) =>
         [
           csvCell(e.date),
-          csvCell(e.kind === "income" ? "Revenu" : "Dépense"),
+          csvCell(KIND_LABELS[e.kind]),
           csvCell(getCategory(e.kind, e.category).label),
           csvCell(e.label),
-          csvCell((e.kind === "income" ? e.amount : -e.amount) / 100),
+          csvCell(signedAmount(e) / 100),
           csvCell(e.regret ? "oui" : ""),
+          csvCell(e.person ?? ""),
           csvCell(e.note),
         ].join(";"),
       );
       // BOM so Excel reads the accents as UTF-8.
-      const csv = "﻿" + ["Date;Type;Catégorie;Libellé;Montant (€);Regretté;Note", ...rows].join("\r\n");
+      const csv = "﻿" + ["Date;Type;Catégorie;Libellé;Montant (€);Regretté;Personne;Note", ...rows].join("\r\n");
       return new Response(csv, {
         headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="monnaie.csv"' },
       });

@@ -42,6 +42,7 @@ const entryFromForm = (formData: FormData) => ({
   date: text(formData, "date"),
   note: text(formData, "note"),
   regret: formData.get("regret") === "on",
+  person: text(formData, "person"),
 });
 
 export async function saveEntry(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -101,7 +102,7 @@ export async function removeGoal(id: string) {
 
 export async function updateSettings(_prev: FormState, formData: FormData): Promise<FormState> {
   const monthlyBudget = parseOptionalAmount(text(formData, "monthlyBudget"));
-  const fixedCosts = parseOptionalAmount(text(formData, "fixedCosts"));
-  if (monthlyBudget === undefined || fixedCosts === undefined) return { error: "Montant invalide (ex : 300 ou 1 250,50)." };
-  return attempt(() => saveSettings({ monthlyBudget, fixedCosts }), "Réglages enregistrés.");
+  const savingsStart = parseOptionalAmount(text(formData, "savingsStart"));
+  if (monthlyBudget === undefined || savingsStart === undefined) return { error: "Montant invalide (ex : 300 ou 1 250,50)." };
+  return attempt(() => saveSettings({ monthlyBudget, savingsStart }), "Réglages enregistrés.");
 }

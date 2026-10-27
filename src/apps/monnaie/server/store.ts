@@ -27,7 +27,11 @@ export async function readLedger(): Promise<Ledger> {
       entries: data.entries ?? [],
       recurring: data.recurring ?? [],
       goals: data.goals ?? [],
-      settings: { ...EMPTY_LEDGER.settings, ...data.settings },
+      // Only known settings: older files also had a single "fixedCosts" amount, now real "charge" entries.
+      settings: {
+        monthlyBudget: data.settings?.monthlyBudget ?? EMPTY_LEDGER.settings.monthlyBudget,
+        savingsStart: data.settings?.savingsStart ?? EMPTY_LEDGER.settings.savingsStart,
+      },
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return structuredClone(EMPTY_LEDGER);
@@ -57,8 +61,8 @@ function update<T>(change: (ledger: Ledger) => T): Promise<T> {
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 function checkKind(value: unknown): Kind {
-  if (value !== "income" && value !== "expense") throw new LedgerError("Type invalide (income ou expense).");
-  return value;
+  if (typeof value !== "string" || !Object.hasOwn(CATEGORIES, value)) throw new LedgerError("Type invalide (income, expense, charge, savings ou debt).");
+  return value as Kind;
 }
 
 function checkAmount(value: unknown): number {
@@ -79,11 +83,13 @@ function checkLabel(value: unknown): string {
   return label;
 }
 
-export type EntryInput = { kind: unknown; amount: unknown; label: unknown; category: unknown; date: unknown; note?: unknown; regret?: unknown };
+export type EntryInput = { kind: unknown; amount: unknown; label: unknown; category: unknown; date: unknown; note?: unknown; regret?: unknown; person?: unknown };
 
 function checkEntry(input: EntryInput) {
   const kind = checkKind(input.kind);
   if (typeof input.date !== "string" || !isValidDate(input.date)) throw new LedgerError("Date invalide (AAAA-MM-JJ).");
+  const person = kind === "debt" ? text(input.person, 60) : "";
+  if (kind === "debt" && !person) throw new LedgerError("Avec qui ? Donne un prénom.");
   return {
     kind,
     amount: checkAmount(input.amount),
@@ -92,6 +98,7 @@ function checkEntry(input: EntryInput) {
     date: input.date,
     note: text(input.note, 500),
     regret: kind === "expense" && input.regret === true,
+    person: person || undefined,
   };
 }
 
@@ -136,6 +143,7 @@ export function deleteEntry(id: string): Promise<boolean> {
 
 export function addRecurring(input: { kind: unknown; amount: unknown; label: unknown; category: unknown; day: unknown }): Promise<Recurring> {
   const kind = checkKind(input.kind);
+  if (kind === "debt") throw new LedgerError("Une dette ne peut pas être récurrente.");
   const day = input.day;
   if (typeof day !== "number" || !Number.isInteger(day) || day < 1 || day > 28) throw new LedgerError("Jour invalide (1 à 28).");
   const recurring: Recurring = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
-import { amountInput, CATEGORIES, type Kind, type Settings } from "../money";
+import { amountInput, CATEGORIES, KIND_LABELS, type Kind, type Settings } from "../money";
 import { createGoal, createRecurring, moveMoney, removeGoal, updateSettings, type FormState } from "../server/actions";
 import { buttonClass, squareClass } from "./kit";
 
@@ -106,12 +106,15 @@ export function SettingsForm({ settings }: { settings: Settings }) {
             <span className="text-xs font-semibold normal-case tracking-normal text-zinc-500">Le max que tu t&apos;autorises en dépenses pas nécessaires. Vide = pas de budget.</span>
           </label>
           <label className={labelClass}>
-            Charges fixes / mois (€)
-            <input name="fixedCosts" inputMode="decimal" defaultValue={amountInput(settings.fixedCosts)} placeholder="1 100" />
+            Solde du livret au départ (€)
+            <input name="savingsStart" inputMode="decimal" defaultValue={amountInput(settings.savingsStart)} placeholder="2 500" />
             <span className="text-xs font-semibold normal-case tracking-normal text-zinc-500">
-              Loyer, factures, courses… Pas détaillées : juste retirées de ce qu&apos;il te reste chaque mois rempli.
+              Ce qu&apos;il y avait sur ton livret avant ta première ligne « Livret » ici. Les virements font évoluer le solde.
             </span>
           </label>
+          <p className="text-sm text-zinc-600">
+            Les charges (loyer, électricité, eau, gaz, assurances…) ne comptent pas dans ce budget : ajoute-les en lignes « Charge », ou en récurrents juste à côté.
+          </p>
           <div>
             <button disabled={pending} className={buttonClass()}>
               <span>Enregistrer</span>
@@ -124,16 +127,20 @@ export function SettingsForm({ settings }: { settings: Settings }) {
 }
 
 export function RecurringForm() {
-  const [kind, setKind] = useState<Kind>("income");
+  // Debts are one-off (they need a person): not offered as recurring.
+  const [kind, setKind] = useState<Exclude<Kind, "debt">>("income");
   return (
     <ActionForm action={createRecurring} className="grid gap-4 sm:grid-cols-2">
       {(pending) => (
         <>
           <label className={labelClass}>
             Type
-            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-              <option value="income">Revenu</option>
-              <option value="expense">Dépense plaisir</option>
+            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as Exclude<Kind, "debt">)}>
+              {(["income", "charge", "savings", "expense"] as const).map((k) => (
+                <option key={k} value={k}>
+                  {KIND_LABELS[k]}
+                </option>
+              ))}
             </select>
           </label>
           <label className={labelClass}>
@@ -148,7 +155,7 @@ export function RecurringForm() {
           </label>
           <label className={labelClass}>
             Nom
-            <input name="label" required maxLength={80} placeholder={kind === "income" ? "Salaire" : "Netflix"} />
+            <input name="label" required maxLength={80} placeholder={{ income: "Salaire", charge: "Loyer", savings: "Virement livret A", expense: "Netflix" }[kind]} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className={labelClass}>

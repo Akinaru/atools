@@ -15,7 +15,7 @@ export function GoalsView({ ledger }: { ledger: Ledger }) {
       subtitle={
         <p>
           {formatMoney(saved, true)} rangés sur {formatMoney(targets, true)} visés ·{" "}
-          <span className={free < 0 ? "text-[var(--mn-red)]" : "text-[var(--mn-accent)]"}>{formatMoney(free, true)} pas encore rangés</span>
+          <span className={free < 0 ? "text-[var(--mn-red)]" : "text-[var(--mn-accent)]"}>{formatMoney(free, true)} du livret pas encore attribués</span>
         </p>
       }
     >

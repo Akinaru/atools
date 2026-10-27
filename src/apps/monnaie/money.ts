@@ -4,7 +4,14 @@
 /** Amounts are integers in cents, never floats. */
 export type Cents = number;
 
-export type Kind = "income" | "expense";
+/**
+ * income: money in · expense: unnecessary spending (the budget) · charge: necessary bills (rent, energy…)
+ * savings: transfer between the current account and the savings account (category "depot" or "retrait")
+ * debt: money owed between me and a `person` (categories below).
+ */
+export type Kind = "income" | "expense" | "charge" | "savings" | "debt";
+
+export const KIND_LABELS: Record<Kind, string> = { income: "Revenu", expense: "Dépense plaisir", charge: "Charge", savings: "Livret", debt: "Dette" };
 
 export type Entry = {
   id: string;
@@ -19,10 +26,12 @@ export type Entry = {
   regret: boolean;
   /** Set when the entry was added from a recurring template. */
   recurringId?: string;
+  /** Debt only: who I owe, or who owes me. */
+  person?: string;
   createdAt: string;
 };
 
-/** Template added in one click each month (salary, subscriptions…). */
+/** Template added in one click each month (salary, rent, subscriptions…). */
 export type Recurring = {
   id: string;
   kind: Kind;
@@ -45,8 +54,8 @@ export type Goal = {
 export type Settings = {
   /** Monthly budget for unnecessary spending. 0 = no budget. */
   monthlyBudget: Cents;
-  /** Rent, bills…: not tracked one by one, subtracted from what is left each month. */
-  fixedCosts: Cents;
+  /** Savings account balance before the first transfer tracked here. */
+  savingsStart: Cents;
 };
 
 export type Ledger = {
@@ -56,13 +65,13 @@ export type Ledger = {
   settings: Settings;
 };
 
-export const EMPTY_LEDGER: Ledger = { entries: [], recurring: [], goals: [], settings: { monthlyBudget: 0, fixedCosts: 0 } };
+export const EMPTY_LEDGER: Ledger = { entries: [], recurring: [], goals: [], settings: { monthlyBudget: 0, savingsStart: 0 } };
 
 export type Category = { id: string; label: string; emoji: string };
 
 export const CATEGORIES: Record<Kind, Category[]> = {
   expense: [
-    { id: "resto", label: "Bouffe & resto", emoji: "🍔" },
+    { id: "resto", label: "Restau & fast-food", emoji: "🍔" },
     { id: "sorties", label: "Sorties", emoji: "🍻" },
     { id: "shopping", label: "Shopping", emoji: "🛍️" },
     { id: "jeux", label: "Jeux & loisirs", emoji: "🎮" },
@@ -77,10 +86,69 @@ export const CATEGORIES: Record<Kind, Category[]> = {
     { id: "freelance", label: "Freelance", emoji: "🧑‍💻" },
     { id: "revente", label: "Revente", emoji: "🏷️" },
     { id: "cadeau", label: "Cadeau", emoji: "🎁" },
-    { id: "remboursement", label: "Remboursement", emoji: "↩️" },
+    { id: "remboursement", label: "Remboursement (sécu, achat…)", emoji: "↩️" },
     { id: "autre", label: "Autre", emoji: "✨" },
   ],
+  charge: [
+    { id: "loyer", label: "Loyer", emoji: "🏠" },
+    { id: "electricite", label: "Électricité", emoji: "⚡" },
+    { id: "gaz", label: "Gaz", emoji: "🔥" },
+    { id: "eau", label: "Eau", emoji: "💧" },
+    { id: "assurances", label: "Assurances", emoji: "🛡️" },
+    { id: "internet", label: "Internet & mobile", emoji: "📶" },
+    { id: "transport", label: "Transport", emoji: "🚇" },
+    { id: "essence", label: "Essence", emoji: "⛽" },
+    { id: "courses", label: "Courses (supermarché)", emoji: "🛒" },
+    { id: "sante", label: "Santé", emoji: "💊" },
+    { id: "impots", label: "Impôts", emoji: "🧾" },
+    { id: "autre", label: "Autre", emoji: "📎" },
+  ],
+  savings: [
+    { id: "depot", label: "Vers le livret", emoji: "🐷" },
+    { id: "retrait", label: "Depuis le livret", emoji: "🔓" },
+  ],
+  // dette: someone paid or lent for me (no money on my account yet) · rembourse: I pay them back.
+  // pret: I paid or lent for someone · recu: they pay me back.
+  debt: [
+    { id: "dette", label: "Je dois", emoji: "🫠" },
+    { id: "rembourse", label: "Je rembourse", emoji: "🤝" },
+    { id: "pret", label: "J'avance pour quelqu'un", emoji: "🫴" },
+    { id: "recu", label: "On me rembourse", emoji: "📥" },
+  ],
 };
+
+type Movement = Pick<Entry, "kind" | "amount" | "category">;
+
+/** Effect on the current account: money in is positive, money out negative, an IOU ("Je dois") 0. */
+export function signedAmount(entry: Movement): Cents {
+  if (entry.kind === "income") return entry.amount;
+  if (entry.kind === "savings") return entry.category === "retrait" ? entry.amount : -entry.amount;
+  if (entry.kind === "debt") return entry.category === "dette" ? 0 : entry.category === "recu" ? entry.amount : -entry.amount;
+  return -entry.amount;
+}
+
+/** What is still owed, per person: `iOwe` (I owe them) and `owesMe` (they owe me), never below 0. */
+export type DebtBalance = { person: string; iOwe: Cents; owesMe: Cents };
+
+export function debtBalances(entries: Entry[]): DebtBalance[] {
+  const map = new Map<string, DebtBalance>();
+  for (const e of entries) {
+    if (e.kind !== "debt" || !e.person) continue;
+    const key = e.person.toLowerCase();
+    const b = map.get(key) ?? { person: e.person, iOwe: 0, owesMe: 0 };
+    if (e.category === "dette") b.iOwe += e.amount;
+    if (e.category === "rembourse") b.iOwe -= e.amount;
+    if (e.category === "pret") b.owesMe += e.amount;
+    if (e.category === "recu") b.owesMe -= e.amount;
+    map.set(key, b);
+  }
+  return [...map.values()]
+    .map((b) => ({ ...b, iOwe: Math.max(b.iOwe, 0), owesMe: Math.max(b.owesMe, 0) }))
+    .sort((a, b) => b.iOwe + b.owesMe - (a.iOwe + a.owesMe));
+}
+
+/** Effect on the savings account: a deposit is positive, a withdrawal negative, anything else 0. */
+export const savingsDelta = (entry: Movement) => (entry.kind !== "savings" ? 0 : entry.category === "retrait" ? -entry.amount : entry.amount);
 
 export function getCategory(kind: Kind, id: string): Category {
   const list = CATEGORIES[kind];
@@ -169,14 +237,21 @@ export type MonthStats = {
   income: Cents;
   spent: Cents;
   regret: Cents;
-  fixedCosts: Cents;
-  /** income - fixed costs - spent. */
+  charges: Cents;
+  /** Net transfers to the savings account (deposits - withdrawals). */
+  saved: Cents;
+  /** Savings account balance at the end of the month. */
+  savingsBalance: Cents;
+  /** Effect of debts on the current account (repaid, advanced, received back). */
+  debtFlow: Cents;
+  /** Left on the current account: income - charges - spent - saved + debtFlow. */
   left: Cents;
-  /** Share of the income left at the end, null without income. */
+  /** Share of the income put on the savings account, null without income. */
   savingsRate: number | null;
   budget: Cents;
   byCategory: CategoryTotal[];
   incomeByCategory: CategoryTotal[];
+  chargesByCategory: CategoryTotal[];
   /** Cumulative spending at the end of each day (index 0 = day 1). */
   cumulative: Cents[];
   /** Biggest single expense. */
@@ -203,9 +278,12 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
   const entries = ledger.entries.filter((e) => monthOf(e.date) === month).sort(byDateDesc);
   const income = sum(entries, "income");
   const spent = sum(entries, "expense");
-  // Fixed costs only count for months with activity: an empty month stays at zero.
-  const fixedCosts = entries.length ? ledger.settings.fixedCosts : 0;
-  const left = income - fixedCosts - spent;
+  const charges = sum(entries, "charge");
+  const saved = entries.reduce((n, e) => n + savingsDelta(e), 0);
+  const debtFlow = entries.reduce((n, e) => (e.kind === "debt" ? n + signedAmount(e) : n), 0);
+  const left = income - charges - spent - saved + debtFlow;
+  const savingsBalance =
+    ledger.settings.savingsStart + ledger.entries.reduce((n, e) => (monthOf(e.date) <= month ? n + savingsDelta(e) : n), 0);
 
   const perDay = Array.from({ length: daysInMonth(month) }, () => 0);
   for (const e of entries) if (e.kind === "expense") perDay[Number(e.date.slice(8)) - 1] += e.amount;
@@ -219,12 +297,16 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
     income,
     spent,
     regret: expenses.reduce((n, e) => (e.regret ? n + e.amount : n), 0),
-    fixedCosts,
+    charges,
+    saved,
+    savingsBalance,
+    debtFlow,
     left,
-    savingsRate: income > 0 ? left / income : null,
+    savingsRate: income > 0 ? saved / income : null,
     budget: ledger.settings.monthlyBudget,
     byCategory: totals(entries, "expense"),
     incomeByCategory: totals(entries, "income"),
+    chargesByCategory: totals(entries, "charge"),
     cumulative,
     biggest: expenses.reduce<Entry | undefined>((best, e) => (!best || e.amount > best.amount ? e : best), undefined),
   };
@@ -235,25 +317,27 @@ export type YearStats = {
   months: MonthStats[];
   income: Cents;
   spent: Cents;
+  charges: Cents;
+  saved: Cents;
   regret: Cents;
   left: Cents;
   byCategory: CategoryTotal[];
-  /** Running total of `left`, month after month. */
-  cumulativeLeft: Cents[];
+  chargesByCategory: CategoryTotal[];
 };
 
 export function yearStats(ledger: Ledger, year: number): YearStats {
   const months = Array.from({ length: 12 }, (_, i) => monthStats(ledger, `${year}-${String(i + 1).padStart(2, "0")}`));
-  let running = 0;
   return {
     year,
     months,
     income: months.reduce((n, m) => n + m.income, 0),
     spent: months.reduce((n, m) => n + m.spent, 0),
+    charges: months.reduce((n, m) => n + m.charges, 0),
+    saved: months.reduce((n, m) => n + m.saved, 0),
     regret: months.reduce((n, m) => n + m.regret, 0),
     left: months.reduce((n, m) => n + m.left, 0),
     byCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "expense"),
-    cumulativeLeft: months.map((m) => (running += m.left)),
+    chargesByCategory: totals(ledger.entries.filter((e) => e.date.startsWith(`${year}-`)), "charge"),
   };
 }
 
@@ -261,12 +345,11 @@ export function yearStats(ledger: Ledger, year: number): YearStats {
 export const pendingRecurring = (ledger: Ledger, month: string) =>
   ledger.recurring.filter((r) => !ledger.entries.some((e) => e.recurringId === r.id && monthOf(e.date) === month));
 
-/** All-time money left (income - fixed costs - spending), minus what sits in the goals. */
-export function freeMoney(ledger: Ledger): Cents {
-  const months = new Set(ledger.entries.map((e) => monthOf(e.date)));
-  const total = ledger.entries.reduce((n, e) => n + (e.kind === "income" ? e.amount : -e.amount), 0);
-  return total - months.size * ledger.settings.fixedCosts - ledger.goals.reduce((n, g) => n + g.saved, 0);
-}
+/** Savings account balance today. */
+export const savingsBalance = (ledger: Ledger): Cents => ledger.settings.savingsStart + ledger.entries.reduce((n, e) => n + savingsDelta(e), 0);
+
+/** Savings account money not assigned to a goal yet (negative when the goals ask for more than the livret holds). */
+export const freeMoney = (ledger: Ledger): Cents => savingsBalance(ledger) - ledger.goals.reduce((n, g) => n + g.saved, 0);
 
 /** Cheeky one-liner on the budget gauge. */
 export function budgetMood(spent: Cents, budget: Cents): string {
