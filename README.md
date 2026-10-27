@@ -114,6 +114,18 @@ curl -X PUT "https://atools.akinaru.fr/api/pokemon-saves/backups/01008DB008C2C00
 
 Codes d'erreur : 400 (jeu, slot ou fichier invalide), 401 (clé API), 404 (save inconnue). Le corps est `{ "error": "…" }`.
 
+### Monnaie (`/api/monnaie`)
+
+Montants en **centimes** (entiers).
+
+| Méthode | Route | Rôle |
+| --- | --- | --- |
+| GET | `/entries` (`?month=AAAA-MM`, `?kind=income\|expense`) | Lignes, les plus récentes d'abord |
+| POST | `/entries` | Ajoute une ligne : `{ kind, amount, label, category, date, note?, regret? }` |
+| DELETE | `/entries/:id` | Supprime une ligne |
+| GET | `/months/:month` | Bilan du mois : encaissé, cramé, reste, budget, par catégorie |
+| GET | `/export.csv` | Toutes les lignes en CSV |
+
 ## Déploiement (Coolify)
 
 Le `Dockerfile` produit une image autonome (Next `output: "standalone"`).
@@ -147,3 +159,17 @@ docker run -p 3000:3000 -v atools-data:/app/data -e ATOOLS_PASSWORD=… -e ATOOL
 
 - **Jeux lus automatiquement** : Gen 1 à 3, Noir/Blanc, X/Y, Rubis Oméga/Saphir Alpha, Let's Go, Épée/Bouclier et Légendes Arceus (pour ces deux derniers, le fichier `main` du dossier de save). Les autres jeux sont stockés, et leurs infos se saisissent à la main.
 - **Images** : jaquettes et badges de Bulbapedia, dans `public/assets/pokemon-saves/`. Les sprites viennent de PokeAPI et demandent une connexion internet.
+
+## App : Monnaie (`src/apps/monnaie`)
+
+Suivi de l'argent : ce que je gagne, ce que je dépense sans nécessité, et ce qu'il reste chaque mois.
+
+| Dossier / fichier | Contenu |
+| --- | --- |
+| `money.ts` | Types, catégories, montants, calcul des stats (pur, sans I/O) |
+| `server/store.ts` | Stockage dans `data/monnaie/ledger.json`, validation des entrées |
+| `server/actions.ts` | Server Actions des formulaires |
+| `ui/` | Écrans : mois, année, objectifs, réglages ; DA dans `ui/monnaie.css` |
+
+- **Pages** : `/apps/monnaie` (mois en cours), `/mois/AAAA-MM`, `/annee/AAAA`, `/objectifs`, `/reglages`.
+- **Raccourci** : X ouvre l'ajout d'une ligne.

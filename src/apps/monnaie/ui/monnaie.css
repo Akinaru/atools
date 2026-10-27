@@ -1,0 +1,297 @@
+/* Art direction of the Monnaie app, after longhoang-lyo.com: night background with dark camo blobs,
+   hand-cut shapes that "boil" (jitter in 4 steps, like a hand-drawn animation), layered SVG buttons,
+   chunky outlined titles. One accent color. Scoped under .mn so the rest of atools keeps its console look.
+   Button shapes live in public/assets/monnaie/ui/. */
+
+.mn {
+  --mn-accent: #ff7a2f;
+  --mn-bg: #15161f;
+  /* Panels are clearly lighter than the page (whose blobs are darker), so they never melt into it. */
+  --mn-panel: #262838;
+  --mn-panel-2: #33364a;
+  --mn-ghost: #454860;
+  --mn-muted: #8f93a5;
+  --mn-ink: #11121a;
+  --mn-red: #f6556d;
+  --mn-yellow: #fec83e;
+  --mn-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  background:
+    url(/assets/monnaie/ui/blobs.svg) 0 0 / 900px 900px repeat,
+    var(--mn-bg);
+  color: #fff;
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-weight: 500;
+}
+
+.mn-punch {
+  font-family: var(--font-punch), var(--font-rounded), sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+/* Big titles: white letters on a dark plate made by a thick stroke painted under the fill. */
+.mn-title {
+  -webkit-text-stroke: 0.16em var(--mn-panel-2);
+  paint-order: stroke fill;
+  text-shadow: 0.04em 0.06em 0 var(--mn-ink);
+}
+
+/* --- Hand-cut shapes that boil --- */
+
+@keyframes mn-boil {
+  0%, 100% { clip-path: polygon(1.2% 2.5%, 98.8% 0%, 96.8% 97.5%, 2.5% 100%); transform: translate(0, 0) scale(1) rotate(0); }
+  25% { clip-path: polygon(0.6% 4.4%, 99.4% 1.9%, 98.1% 98.8%, 2.5% 95.6%); transform: translate(-0.15rem, 0.1rem) scale(1.005, 0.995) rotate(-0.3deg); }
+  50% { clip-path: polygon(0% 5.6%, 98.8% 0.6%, 96.8% 99.4%, 3.8% 94.4%); transform: translate(0.1rem, -0.15rem) scale(0.995, 1.005) rotate(0.3deg); }
+  75% { clip-path: polygon(1.2% 3.8%, 100% 1.2%, 96.2% 98.1%, 1.9% 96.2%); transform: translate(-0.1rem, -0.1rem) scale(1.002) rotate(-0.2deg); }
+}
+
+/* The shape is a pseudo-element: it boils, the content on top stays still and readable. */
+.mn-shape {
+  position: relative;
+  isolation: isolate;
+}
+
+.mn-shape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--mn-shape, #fff);
+  clip-path: polygon(1.2% 2.5%, 98.8% 0%, 96.8% 97.5%, 2.5% 100%);
+}
+
+.mn-boil::before {
+  animation: mn-boil 0.45s steps(4, end) infinite;
+}
+
+/* Paper card: white sheet with a hard dark shadow. */
+.mn-paper {
+  --mn-shape: #fff;
+  color: var(--mn-ink);
+  filter: drop-shadow(0.45rem 0.6rem 0 rgba(0, 0, 0, 0.6));
+}
+
+/* Lime-like slab behind a headline, now in the accent color. */
+.mn-slab {
+  --mn-shape: var(--mn-accent);
+  color: var(--mn-ink);
+}
+
+/* --- Buttons (layers: dark shadow plate, accent surface, dark "elevated" plate on hover) --- */
+
+.mn-btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 9.5rem;
+  height: 3.6rem;
+  padding: 0.15rem 1.9rem 0.55rem;
+  color: var(--mn-ink);
+  background: url(/assets/monnaie/ui/overlay.svg) center / 100% 100% no-repeat;
+  transition: transform 0.22s var(--mn-ease), color 0.16s ease-out;
+}
+
+.mn-btn::before,
+.mn-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mn-btn::before {
+  z-index: -1;
+  background: url(/assets/monnaie/ui/surface-outline.svg) center / 100% 100% no-repeat, var(--mn-accent);
+  -webkit-mask: url(/assets/monnaie/ui/surface-mask.svg) center / 100% 100% no-repeat;
+  mask: url(/assets/monnaie/ui/surface-mask.svg) center / 100% 100% no-repeat;
+  animation: mn-boil 0.45s steps(4, end) infinite;
+}
+
+.mn-btn::after {
+  z-index: -1;
+  background: url(/assets/monnaie/ui/elevated.svg) center / 100% 100% no-repeat;
+  transform: scale(0) rotate(-8deg);
+  transition: transform 0.22s var(--mn-ease);
+}
+
+.mn-btn > * , .mn-btn-label {
+  display: inline-block;
+  transform: rotate(-1.5deg);
+  transition: transform 0.12s var(--mn-ease);
+}
+
+.mn-btn:hover:not(:disabled) {
+  color: var(--mn-accent);
+  transform: translateY(-0.15rem);
+}
+
+.mn-btn:hover:not(:disabled)::after {
+  transform: scale(1.1) rotate(0);
+}
+
+.mn-btn:hover:not(:disabled) > * {
+  transform: rotate(3deg) scale(1.1);
+}
+
+.mn-btn:active:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.mn-btn:active:not(:disabled)::after {
+  transform: scale(0.9) rotate(-8deg);
+}
+
+.mn-btn:disabled {
+  opacity: 0.56;
+}
+
+.mn-btn--sm {
+  min-width: 7rem;
+  height: 2.9rem;
+  padding: 0.1rem 1.3rem 0.45rem;
+}
+
+/* Secondary button: same cut, dark surface, white outline. */
+.mn-btn--dark {
+  color: #fff;
+}
+
+.mn-btn--dark::before {
+  background: url(/assets/monnaie/ui/surface-outline.svg) center / 100% 100% no-repeat, var(--mn-panel-2);
+}
+
+.mn-btn--dark::after {
+  background: url(/assets/monnaie/ui/surface-mask.svg) center / 100% 100% no-repeat;
+  filter: invert(1);
+}
+
+.mn-btn--dark:hover:not(:disabled) {
+  color: var(--mn-ink);
+}
+
+/* Square icon button (close ✕, arrows): dark plate, white outline and a tilt on hover. */
+.mn-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  color: #fff;
+  font-family: var(--font-punch), sans-serif;
+  font-size: 1.15rem;
+  background: url(/assets/monnaie/ui/square.svg) center / 100% 100% no-repeat;
+  transition: transform 0.11s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mn-square:hover {
+  background-image: url(/assets/monnaie/ui/square-hover.svg);
+  transform: scale(1.08) rotate(4deg);
+}
+
+.mn-square:active {
+  transform: scale(0.96);
+}
+
+/* On white paper, the plate is barely there until hovered. */
+.mn-square--light {
+  color: var(--mn-ink);
+  background-image: none;
+}
+
+.mn-square--light:hover {
+  color: #fff;
+}
+
+/* --- Nav words --- */
+
+.mn-ghost {
+  color: var(--mn-ghost);
+  transition: color 0.15s ease, transform 0.15s var(--mn-ease);
+}
+
+.mn-ghost:hover {
+  color: var(--mn-muted);
+  transform: rotate(-3deg) scale(1.06);
+}
+
+/* --- Stamps ("BUDGET EXPLOSÉ", "ATTEINT") --- */
+
+.mn-stamp {
+  display: inline-block;
+  border: 0.22rem solid currentColor;
+  padding: 0.35rem 0.7rem 0.15rem;
+  font-family: var(--font-punch), sans-serif;
+  text-transform: uppercase;
+  line-height: 1;
+  mix-blend-mode: multiply;
+  mask: repeating-linear-gradient(115deg, #000 0 7px, rgba(0, 0, 0, 0.82) 7px 9px);
+}
+
+/* --- Entrance animations --- */
+
+@keyframes mn-drop {
+  from { opacity: 0; transform: translateY(-1rem) rotate(var(--mn-tilt, 0deg)) scale(1.05); }
+  to { opacity: 1; transform: rotate(var(--mn-tilt, 0deg)); }
+}
+
+.mn-drop {
+  transform: rotate(var(--mn-tilt, 0deg));
+  animation: mn-drop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes mn-grow {
+  from { transform: scaleX(0); }
+}
+
+.mn-grow {
+  transform-origin: left;
+  animation: mn-grow 0.7s var(--mn-ease) both;
+}
+
+@keyframes mn-slam {
+  0% { opacity: 0; transform: scale(2.4) rotate(var(--mn-tilt, -8deg)); }
+  60% { opacity: 1; transform: scale(0.94) rotate(var(--mn-tilt, -8deg)); }
+  100% { opacity: 1; transform: scale(1) rotate(var(--mn-tilt, -8deg)); }
+}
+
+.mn-slam {
+  animation: mn-slam 0.45s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-drop, .mn-grow, .mn-slam, .mn-boil::before, .mn-btn::before { animation: none; }
+}
+
+/* --- Forms --- */
+
+.mn input:not([type="checkbox"]):not([type="radio"]), .mn select, .mn textarea {
+  border: 0.15rem solid var(--mn-ink);
+  background: #fff;
+  color: var(--mn-ink);
+  border-radius: 0;
+  padding: 0.6rem 0.75rem;
+  font-weight: 600;
+  outline: none;
+  transition: box-shadow 0.11s ease, transform 0.11s ease;
+}
+
+.mn input:focus-visible, .mn select:focus-visible, .mn textarea:focus-visible {
+  box-shadow: 0.25rem 0.25rem 0 var(--mn-accent), 0.25rem 0.25rem 0 0.15rem var(--mn-ink);
+  transform: translate(-1px, -1px);
+}
+
+.mn :focus-visible {
+  outline: 0.2rem solid var(--mn-yellow);
+  outline-offset: 0.2rem;
+}
+
+.mn dialog::backdrop {
+  background: rgba(17, 18, 26, 0.86);
+  backdrop-filter: blur(3px);
+}
