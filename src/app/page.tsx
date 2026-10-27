@@ -8,7 +8,7 @@ export default function Home() {
   // Empty slots fill the home screen up to two full rows, like a console with few apps.
   const placeholders = Math.max(MIN_SLOTS - apps.length, (SLOTS_PER_ROW - (apps.length % SLOTS_PER_ROW)) % SLOTS_PER_ROW);
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-8">
+    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 pb-18 pt-8">
       <NavGrid
         columnsClassName="grid-cols-3 sm:grid-cols-5"
         placeholders={placeholders}
