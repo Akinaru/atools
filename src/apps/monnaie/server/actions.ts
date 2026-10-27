@@ -10,6 +10,9 @@ import { categoriesOf, MONTH_PATTERN, parseAmount, parseOptionalAmount, type Cat
 import {
   addEntry,
   addGoal,
+  addSavingsAccount,
+  deleteSavingsAccount,
+  importSavingsOperations,
   bulkDeleteEntries,
   bulkEditEntries,
   type BulkPatch,
@@ -62,6 +65,7 @@ const entryFromForm = (formData: FormData) => ({
   note: text(formData, "note"),
   regret: formData.get("regret") === "on",
   person: text(formData, "person"),
+  account: text(formData, "account"),
 });
 
 export async function saveEntry(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -173,7 +177,7 @@ export async function removeCheckpoint(id: string) {
 
 /** A bank operation with what Monnaie suggests to make of it. */
 export type PreviewRow = BankOperation & { suggestion: Suggestion; match: string };
-export type PreviewState = { error?: string; fileName?: string; rows?: PreviewRow[]; alreadyImported?: number; categories?: Categories };
+export type PreviewState = { error?: string; message?: string; fileName?: string; rows?: PreviewRow[]; alreadyImported?: number; categories?: Categories };
 
 const MAX_IMPORT_SIZE = 5 * 1024 * 1024;
 
@@ -184,6 +188,16 @@ export async function previewImport(_prev: PreviewState, formData: FormData): Pr
   if (file.size > MAX_IMPORT_SIZE) return { error: "Fichier trop gros (5 Mo max)." };
   try {
     const operations = parseCaisseEpargneCsv(decodeBankFile(new Uint8Array(await file.arrayBuffer())));
+    // A livret's export: nothing to review, its transfers are matched with the current account's lines.
+    const account = text(formData, "account");
+    if (account) {
+      const { linked, added, interest, skipped } = await importSavingsOperations(account, operations);
+      refresh();
+      const parts = [`${linked} virement${linked > 1 ? "s" : ""} rattaché${linked > 1 ? "s" : ""}`, `${interest} ligne${interest > 1 ? "s" : ""} d'intérêts`];
+      if (added) parts.push(`${added} virement${added > 1 ? "s" : ""} pas encore vu${added > 1 ? "s" : ""} sur le compte courant, ajouté${added > 1 ? "s" : ""}`);
+      if (skipped) parts.push(`${skipped} déjà là`);
+      return { fileName: file.name, message: `${parts.join(" · ")}.` };
+    }
     await refreshBookedDates(operations);
     const ledger = await readLedger();
     const known = new Set(ledger.entries.map((e) => e.importId).filter(Boolean));
@@ -195,7 +209,7 @@ export async function previewImport(_prev: PreviewState, formData: FormData): Pr
       rows: fresh.map((op) => ({ ...op, match: normalizeBankLabel(op.label), suggestion: suggest(op, ledger.rules) })),
     };
   } catch (error) {
-    if (error instanceof BankFileError) return { error: error.message };
+    if (error instanceof BankFileError || error instanceof LedgerError) return { error: error.message };
     throw error;
   }
 }
@@ -220,6 +234,15 @@ export async function commitImport(_prev: FormState, formData: FormData): Promis
     if (error instanceof LedgerError) return { error: error.message };
     throw error;
   }
+}
+
+export async function createSavingsAccount(_prev: FormState, formData: FormData): Promise<FormState> {
+  return attempt(() => addSavingsAccount({ name: text(formData, "name"), emoji: text(formData, "emoji") }), "Livret ajouté.");
+}
+
+export async function removeSavingsAccount(id: string) {
+  await deleteSavingsAccount(id);
+  refresh();
 }
 
 export async function removeRule(match: string) {

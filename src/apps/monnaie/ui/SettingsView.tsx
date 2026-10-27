@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, type Ledger } from "../money";
-import { removeCategory, removeCheckpoint, removeRecurring, removeRule } from "../server/actions";
-import { CategoryBudgetsForm, CategoryForm, CheckpointForm, RecurringForm, RestoreForm, SettingsForm } from "./forms";
+import { categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, savingsAccountBalances, type Ledger } from "../money";
+import { removeCategory, removeCheckpoint, removeRecurring, removeRule, removeSavingsAccount } from "../server/actions";
+import { CategoryBudgetsForm, CategoryForm, CheckpointForm, RecurringForm, RestoreForm, SavingsAccountForm, SettingsForm } from "./forms";
 import { ImportClient } from "./ImportClient";
 import { LinkPending, PendingButton } from "./motion";
 import { BASE, buttonClass, Panel, PanelTitle, Paper, Screen, squareClass, Tag } from "./kit";
@@ -10,7 +10,8 @@ import { BASE, buttonClass, Panel, PanelTitle, Paper, Screen, squareClass, Tag }
 /** Tabs of the settings, each at /reglages/<key> (the first one at /reglages). */
 export const SETTINGS_TABS = [
   { key: "", label: "Budget", emoji: "🎯", hint: "Plafond plaisir, par catégorie" },
-  { key: "import", label: "Import", emoji: "🏦", hint: "Relevé bancaire, règles" },
+  { key: "livrets", label: "Livrets", emoji: "🐷", hint: "Tes comptes épargne et leur solde" },
+  { key: "import", label: "Import", emoji: "🏦", hint: "Relevés bancaires, règles" },
   { key: "categories", label: "Catégories", emoji: "🏷️", hint: "Les tiennes" },
   { key: "recurrents", label: "Récurrents", emoji: "⟳", hint: "Ce qui revient chaque mois" },
   { key: "pointages", label: "Pointages", emoji: "📍", hint: "Le vrai solde du compte" },
@@ -72,9 +73,57 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
           </Panel>
     </>
   ),
+  livrets: (ledger) => {
+    const balances = savingsAccountBalances(ledger);
+    const unassigned = (balances.get("") ?? 0) + ledger.settings.savingsStart;
+    const total = [...balances.values()].reduce((n, b) => n + b, 0) + ledger.settings.savingsStart;
+    return (
+      <>
+        <Panel>
+          <PanelTitle aside={<Tag>{formatMoney(total)} en tout</Tag>}>Tes livrets</PanelTitle>
+          <p className="mb-5 max-w-3xl text-zinc-400">
+            Chaque virement vers ou depuis l&apos;épargne appartient à un livret. Importe le relevé d&apos;un livret (onglet Import) : ses virements sont
+            rattachés aux lignes du compte courant, et ses intérêts ajoutés.
+          </p>
+          {ledger.savingsAccounts.length > 0 && (
+            <ul className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {ledger.savingsAccounts.map((a) => {
+                const count = ledger.entries.filter((e) => e.kind === "savings" && e.account === a.id).length;
+                return (
+                  <li key={a.id} className="mn-shape flex items-center gap-3 px-4 py-3" style={{ "--mn-shape": "var(--mn-panel-2)" } as CSSProperties}>
+                    <span className="flex h-11 w-11 shrink-0 -rotate-6 items-center justify-center bg-[var(--mn-yellow)] text-xl shadow-[3px_3px_0_var(--mn-ink)]" aria-hidden>
+                      {a.emoji}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="mn-punch block text-lg leading-tight">{a.name}</span>
+                      <span className="block truncate text-sm text-zinc-500">
+                        {count} ligne{count > 1 ? "s" : ""}
+                      </span>
+                    </span>
+                    <span className="mn-punch text-xl text-[var(--mn-yellow)]">{formatMoney(balances.get(a.id) ?? 0)}</span>
+                    <form action={removeSavingsAccount.bind(null, a.id)}>
+                      <PendingButton className={squareClass()} label={`Supprimer ${a.name}`} title="Supprimer (ses lignes restent, sans livret)">
+                        ✕
+                      </PendingButton>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {unassigned !== 0 && (
+            <p className="mb-6 text-sm text-zinc-400">
+              Pas encore rattaché à un livret : <b className="text-white">{formatMoney(unassigned)}</b>
+            </p>
+          )}
+          <SavingsAccountForm />
+        </Panel>
+      </>
+    );
+  },
   import: (ledger) => (
     <>
-      <ImportClient />
+      <ImportClient accounts={ledger.savingsAccounts} />
           <Panel>
             <PanelTitle aside={<Tag>{ledger.rules.length}</Tag>}>Règles d&apos;import</PanelTitle>
             {ledger.rules.length ? (

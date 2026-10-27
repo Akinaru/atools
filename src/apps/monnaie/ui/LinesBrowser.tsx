@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { isTyping, playSound } from "@/components/console/sound";
-import { CUSTOMIZABLE_KINDS, formatSigned, getCategory, monthName, monthShortName, signedAmount, type Categories, type Entry, type Kind } from "../money";
+import { CUSTOMIZABLE_KINDS, formatSigned, getCategory, lineCategoryLabel, monthName, monthShortName, signedAmount, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
 import { deleteLines, editLines } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { buttonClass } from "./kit";
@@ -28,7 +28,7 @@ type Group = { label: string; ids: string[]; total: number; last: string; emojis
  * Every line of the ledger: search, filter, sort, then select (click, shift-click for a range, ⌘A for all) and act
  * on the selection: rename, reclassify, regret, delete. "Libellés" groups lines by name to rename one everywhere.
  */
-export function LinesBrowser({ entries, categories }: { entries: Entry[]; categories: Categories }) {
+export function LinesBrowser({ entries, categories, accounts }: { entries: Entry[]; categories: Categories; accounts: SavingsAccount[] }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [period, setPeriod] = useState("");
@@ -224,6 +224,7 @@ export function LinesBrowser({ entries, categories }: { entries: Entry[]; catego
                   </span>
                   <EntryDialog
                     categories={categories}
+                    accounts={accounts}
                     sameLabel={entries.filter((e) => e.label === entry.label).length}
                     defaultDate={entry.date}
                     entry={entry}
@@ -234,7 +235,7 @@ export function LinesBrowser({ entries, categories }: { entries: Entry[]; catego
                           {entry.regret && <span className="ml-2 text-xs text-[var(--mn-red)]">REGRET</span>}
                         </span>
                         <span className="block truncate text-xs text-[var(--mn-muted)] empty:hidden">
-                          <span className="sm:hidden">{shortDate(entry.date)} · {cat.label}</span>
+                          <span className="sm:hidden">{shortDate(entry.date)} · {lineCategoryLabel(entry, categories, accounts)}</span>
                           {(entry.note || entry.person) && <span className="max-sm:before:content-['_·_']">{[entry.person, entry.note].filter(Boolean).join(" · ")}</span>}
                         </span>
                       </span>
@@ -242,7 +243,7 @@ export function LinesBrowser({ entries, categories }: { entries: Entry[]; catego
                   />
                   <span className="hidden items-center gap-2 truncate text-sm text-[var(--mn-muted)] sm:flex">
                     <span className="h-2.5 w-2.5 shrink-0 rotate-45" style={{ background: KIND_COLORS[entry.kind] }} aria-hidden />
-                    <span className="truncate">{cat.label}</span>
+                    <span className="truncate">{lineCategoryLabel(entry, categories, accounts)}</span>
                   </span>
                   <span className={`mn-punch min-w-24 text-right text-xl ${AMOUNT[entry.kind]}`}>{formatSigned(signedAmount(entry))}</span>
                 </li>

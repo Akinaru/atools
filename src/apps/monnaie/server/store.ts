@@ -18,6 +18,7 @@ import {
   type Kind,
   type Ledger,
   type Recurring,
+  type SavingsAccount,
   type Settings,
 } from "../money";
 
@@ -43,6 +44,7 @@ export async function readLedger(): Promise<Ledger> {
       goals: data.goals ?? [],
       rules: data.rules ?? [],
       checkpoints: data.checkpoints ?? [],
+      savingsAccounts: data.savingsAccounts ?? [],
       customCategories: data.customCategories ?? [],
       categoryBudgets: data.categoryBudgets ?? {},
       // Only known settings: older files also had a single "fixedCosts" amount, now real "charge" entries.
@@ -105,13 +107,26 @@ function checkLabel(value: unknown): string {
   return label;
 }
 
-export type EntryInput = { kind: unknown; amount: unknown; label: unknown; category: unknown; date: unknown; note?: unknown; regret?: unknown; person?: unknown };
+export type EntryInput = {
+  kind: unknown;
+  amount: unknown;
+  label: unknown;
+  category: unknown;
+  date: unknown;
+  note?: unknown;
+  regret?: unknown;
+  person?: unknown;
+  account?: unknown;
+};
 
-function checkEntry(input: EntryInput, categories: Categories) {
+/** Validates a line against the ledger's categories and savings accounts. */
+function checkEntry(input: EntryInput, ledger: Ledger, categories: Categories = categoriesOf(ledger)) {
   const kind = checkKind(input.kind);
   if (typeof input.date !== "string" || !isValidDate(input.date)) throw new LedgerError("Date invalide (AAAA-MM-JJ).");
   const person = kind === "debt" ? text(input.person, 60) : "";
   if (kind === "debt" && !person) throw new LedgerError("Avec qui ? Donne un prénom.");
+  const account = kind === "savings" ? text(input.account, 60) : "";
+  if (account && !ledger.savingsAccounts.some((a) => a.id === account)) throw new LedgerError("Livret inconnu.");
   return {
     kind,
     amount: checkAmount(input.amount),
@@ -121,6 +136,7 @@ function checkEntry(input: EntryInput, categories: Categories) {
     note: text(input.note, 500),
     regret: kind === "expense" && input.regret === true,
     person: person || undefined,
+    account: account || undefined,
   };
 }
 
@@ -128,7 +144,7 @@ function checkEntry(input: EntryInput, categories: Categories) {
 
 export function addEntry(input: EntryInput): Promise<Entry> {
   return update((ledger) => {
-    const checked = checkEntry(input, categoriesOf(ledger));
+    const checked = checkEntry(input, ledger);
     const entry: Entry = { id: randomUUID(), ...checked, createdAt: new Date().toISOString() };
     ledger.entries.push(entry);
     return entry;
@@ -137,7 +153,7 @@ export function addEntry(input: EntryInput): Promise<Entry> {
 
 export function editEntry(id: string, input: EntryInput): Promise<Entry> {
   return update((ledger) => {
-    const checked = checkEntry(input, categoriesOf(ledger));
+    const checked = checkEntry(input, ledger);
     const entry = ledger.entries.find((e) => e.id === id);
     if (!entry) throw new LedgerError("Ligne introuvable.");
     // A date changed by hand no longer matches the bank's booking day.
@@ -155,7 +171,7 @@ export function patchEntry(id: string, patch: Partial<EntryInput>): Promise<Entr
     const fields = ["kind", "amount", "label", "category", "date", "note", "regret", "person"] as const;
     const input: EntryInput = { kind: entry.kind, amount: entry.amount, label: entry.label, category: entry.category, date: entry.date, note: entry.note, regret: entry.regret, person: entry.person };
     for (const key of fields) if (key in patch) input[key] = patch[key];
-    const checked = checkEntry(input, categoriesOf(ledger));
+    const checked = checkEntry(input, ledger);
     if (checked.date !== entry.date) delete entry.bookedDate;
     Object.assign(entry, checked);
     return entry;
@@ -187,7 +203,7 @@ export function bulkEditEntries(ids: string[], patch: BulkPatch, learn = false):
     const checked = entries.map((entry) => {
       const input: EntryInput = { ...entry };
       for (const key of ["label", "kind", "category", "regret"] as const) if (key in patch) input[key] = patch[key];
-      return [entry, checkEntry(input, categories)] as const;
+      return [entry, checkEntry(input, ledger, categories)] as const;
     });
     let changed = 0;
     for (const [entry, next] of checked) {
@@ -367,7 +383,7 @@ export function importOperations(rows: ImportRow[]): Promise<{ added: number; sk
       const rule = row.remember === true && typeof row.match === "string" && row.match.trim() ? row.match.trim().slice(0, 120) : undefined;
       if (row.ignore === true) return { importId: row.importId, ignore: true as const, rule: rule ? { match: rule, ignore: true } : undefined };
       try {
-        const entry = checkEntry(row, categories);
+        const entry = checkEntry(row, ledger, categories);
         const learned: ImportRule | undefined = rule
           ? { match: rule, kind: entry.kind, category: entry.category, label: entry.label, person: entry.person }
           : undefined;
@@ -389,12 +405,93 @@ export function importOperations(rows: ImportRow[]): Promise<{ added: number; sk
         continue;
       }
       known.add(row.importId);
+      // A transfer already brought in by the livret's own export: the same line, now seen from the current account.
+      const twin = row.entry.kind === "savings" ? findTransfer(ledger.entries, row.entry, (e) => !e.importId && !!e.pocketImportId) : undefined;
+      if (twin) {
+        Object.assign(twin, { importId: row.importId, bookedDate: row.bookedDate });
+        skipped++;
+        continue;
+      }
       ledger.entries.push({ id: randomUUID(), ...row.entry, importId: row.importId, bookedDate: row.bookedDate, createdAt: now });
       added++;
     }
     const rules = checked.flatMap((row) => (row.rule ? [row.rule] : []));
     for (const rule of rules) ledger.rules = [...ledger.rules.filter((r) => r.match !== rule.match), rule];
     return { added, skipped, rules: rules.length };
+  });
+}
+
+/** The same transfer (direction and amount) a few days apart at most: banks book both sides on different days. */
+function findTransfer(entries: Entry[], target: Pick<Entry, "category" | "amount" | "date">, eligible: (e: Entry) => boolean) {
+  const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86_400_000;
+  return entries
+    .filter((e) => e.kind === "savings" && e.category === target.category && e.amount === target.amount && Math.abs(day(e.date) - day(target.date)) <= 4 && eligible(e))
+    .sort((a, b) => Math.abs(day(a.date) - day(target.date)) - Math.abs(day(b.date) - day(target.date)))[0];
+}
+
+/**
+ * Imports a livret's own export into savings account `accountId`. Each transfer is matched with the line already
+ * imported from the current account (it gets attributed to this livret); interest becomes a new line; a transfer
+ * not found yet is added (the current-account import will match it later).
+ */
+export function importSavingsOperations(
+  accountId: string,
+  operations: { importId: string; date: string; label: string; amount: number }[],
+): Promise<{ linked: number; added: number; interest: number; skipped: number }> {
+  return update((ledger) => {
+    const account = ledger.savingsAccounts.find((a) => a.id === accountId);
+    if (!account) throw new LedgerError("Livret inconnu.");
+    const known = new Set(ledger.entries.map((e) => e.pocketImportId).filter(Boolean));
+    const result = { linked: 0, added: 0, interest: 0, skipped: 0 };
+    const now = new Date().toISOString();
+    for (const op of operations) {
+      if (known.has(op.importId)) {
+        result.skipped++;
+        continue;
+      }
+      if (!Number.isInteger(op.amount) || op.amount === 0 || !isValidDate(op.date)) throw new LedgerError("Opération invalide.");
+      known.add(op.importId);
+      const base = { amount: Math.abs(op.amount), date: op.date, note: "", regret: false, account: account.id, pocketImportId: op.importId, createdAt: now };
+      if (/^INTERETS\b/i.test(normalizeBankLabel(op.label)) && op.amount > 0) {
+        ledger.entries.push({ id: randomUUID(), kind: "savings", category: "interets", label: toLabel(`INTÉRÊTS ${account.name}`), ...base });
+        result.interest++;
+        continue;
+      }
+      // Money in on the livret is a deposit from the current account.
+      const category = op.amount > 0 ? "depot" : "retrait";
+      const twin = findTransfer(ledger.entries, { category, amount: Math.abs(op.amount), date: op.date }, (e) => !e.pocketImportId && (!e.account || e.account === account.id));
+      if (twin) {
+        Object.assign(twin, { account: account.id, pocketImportId: op.importId });
+        result.linked++;
+      } else {
+        ledger.entries.push({ id: randomUUID(), kind: "savings", category, label: toLabel(op.label), ...base });
+        result.added++;
+      }
+    }
+    return result;
+  });
+}
+
+// --- Savings accounts ---
+
+export function addSavingsAccount(input: { name: unknown; emoji: unknown }): Promise<SavingsAccount> {
+  const name = text(input.name, 30);
+  if (!name) throw new LedgerError("Donne un nom au livret.");
+  const emoji = [...text(input.emoji, 16)].slice(0, 2).join("") || "🐷";
+  return update((ledger) => {
+    if (ledger.savingsAccounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) throw new LedgerError("Ce livret existe déjà.");
+    const slug = name.normalize("NFD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 30) || "livret";
+    const account: SavingsAccount = { id: `l-${slug}-${randomUUID().slice(0, 4)}`, name, emoji };
+    ledger.savingsAccounts.push(account);
+    return account;
+  });
+}
+
+/** Deletes a savings account: its lines stay (the money moved), no longer attributed to a livret. */
+export function deleteSavingsAccount(id: string): Promise<void> {
+  return update((ledger) => {
+    ledger.savingsAccounts = ledger.savingsAccounts.filter((a) => a.id !== id);
+    for (const entry of ledger.entries) if (entry.account === id) delete entry.account;
   });
 }
 

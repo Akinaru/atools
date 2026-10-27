@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition, type CSSProperties } from "react";
-import { dayParts, formatSigned, getCategory, monthShortName, savingsDelta, signedAmount, type Categories, type Entry, type Kind } from "../money";
+import { dayParts, formatSigned, getCategory, lineCategoryLabel, monthShortName, savingsDelta, signedAmount, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
 import { flipRegret, removeEntry } from "../server/actions";
 import { EntryDialog } from "./EntryDialog";
 import { squareClass } from "./kit";
@@ -24,7 +24,7 @@ const AMOUNT: Record<Kind, string> = {
 };
 
 /** Entries of a month, grouped by day, newest first: a big date on the left, one ticket per entry. */
-export function EntryList({ entries, categories, labelCounts = {} }: { entries: Entry[]; categories: Categories; labelCounts?: Record<string, number> }) {
+export function EntryList({ entries, categories, accounts, labelCounts = {} }: { entries: Entry[]; categories: Categories; accounts: SavingsAccount[]; labelCounts?: Record<string, number> }) {
   const days = new Map<string, Entry[]>();
   for (const entry of entries) days.set(entry.date, [...(days.get(entry.date) ?? []), entry]);
 
@@ -47,7 +47,7 @@ export function EntryList({ entries, categories, labelCounts = {} }: { entries: 
             </header>
             <ul className="grid content-start gap-3">
               {list.map((entry) => (
-                <EntryRow key={entry.id} entry={entry} categories={categories} sameLabel={labelCounts[entry.label] ?? 1} tilt={row++ % 2 ? 0.35 : -0.35} />
+                <EntryRow key={entry.id} entry={entry} categories={categories} accounts={accounts} sameLabel={labelCounts[entry.label] ?? 1} tilt={row++ % 2 ? 0.35 : -0.35} />
               ))}
             </ul>
           </section>
@@ -61,7 +61,7 @@ export function EntryList({ entries, categories, labelCounts = {} }: { entries: 
  * One entry as a slightly tilted ticket: sticker, label, amount; actions show on hover. Deleting and
  * regretting are optimistic: the row reacts at once, the server follows (and the row comes back on error).
  */
-function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; categories: Categories; sameLabel: number; tilt: number }) {
+function EntryRow({ entry, categories, accounts, sameLabel, tilt }: { entry: Entry; categories: Categories; accounts: SavingsAccount[]; sameLabel: number; tilt: number }) {
   const category = getCategory(entry.kind, entry.category, categories);
   const [pending, startTransition] = useTransition();
   const [regret, setRegret] = useOptimistic(entry.regret);
@@ -106,6 +106,7 @@ function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; catego
 
       <EntryDialog
         categories={categories}
+        accounts={accounts}
         sameLabel={sameLabel}
         defaultDate={entry.date}
         entry={entry}
@@ -123,7 +124,7 @@ function EntryRow({ entry, categories, sameLabel, tilt }: { entry: Entry; catego
               )}
             </span>
             <span className="block truncate text-sm text-[var(--mn-muted)]">
-              {category.label}
+              {lineCategoryLabel(entry, categories, accounts)}
               {entry.person && ` · ${entry.person}`}
               {entry.note && ` · ${entry.note}`}
             </span>

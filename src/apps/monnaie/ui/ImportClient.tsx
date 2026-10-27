@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState, type CSSProperties } from "react";
-import { formatMoney, formatSigned, KIND_LABELS, type Categories, type Kind } from "../money";
+import { formatMoney, formatSigned, KIND_LABELS, type Categories, type Kind, type SavingsAccount } from "../money";
 import { commitImport, previewImport, type PreviewRow } from "../server/actions";
 import { BASE, buttonClass } from "./kit";
 import { categoryOptions, kindOptions, Picker } from "./Picker";
@@ -36,8 +36,9 @@ const toDraft = (row: PreviewRow): Draft => ({
 const needsReview = (d: Draft) => !d.ignore && d.row.suggestion.source !== "rule" && (d.row.suggestion.source === "default" || d.kind === "debt");
 
 /** Upload a bank export, review what each operation becomes, then import. */
-export function ImportClient() {
+export function ImportClient({ accounts }: { accounts: SavingsAccount[] }) {
   const [preview, previewAction, previewing] = useActionState(previewImport, {});
+  const [account, setAccount] = useState("");
   return (
     <div className="grid gap-10">
       <form action={previewAction} className="mn-shape mn-paper mn-drop grid gap-4 p-6 sm:p-8" style={{ "--mn-tilt": "-0.8deg" } as CSSProperties}>
@@ -47,6 +48,16 @@ export function ImportClient() {
           déjà importées sont sautées : tu peux réimporter une période qui chevauche.
         </p>
         <div className="flex flex-wrap items-center gap-4">
+          {accounts.length > 0 && (
+            <Picker
+              ariaLabel="Compte"
+              name="account"
+              className="w-56"
+              value={account}
+              onChange={setAccount}
+              options={[{ value: "", label: "Compte courant", emoji: "💳" }, ...accounts.map((a) => ({ value: a.id, label: a.name, emoji: a.emoji }))]}
+            />
+          )}
           <input
             type="file"
             name="file"
@@ -59,6 +70,7 @@ export function ImportClient() {
           </button>
         </div>
         {preview.error && <p className="font-bold text-[var(--mn-red)]">{preview.error}</p>}
+        {preview.message && <p className="font-bold">✓ {preview.message}</p>}
       </form>
 
       {/* A new analysis remounts the review with fresh drafts. */}

@@ -129,7 +129,7 @@ Montants en **centimes** (entiers).
 | GET | `/export.csv` | Toutes les lignes en CSV |
 | GET | `/backup.json` | Sauvegarde complète. L'en-tête `ETag` donne sa version |
 | PUT | `/backup.json` | Remplace toute la base. `If-Match: <ETag lu>` obligatoire (428 sans, 412 si la base a changé depuis). L'ancienne base est gardée dans `data/monnaie/ledger.before-restore-*.json` |
-| POST | `/import` (`?dryRun=1`) | Importe un export CSV Caisse d'Épargne (corps brut) : règles apprises puis catégories de la banque, opérations déjà importées sautées |
+| POST | `/import` (`?dryRun=1`, `?account=<livret>`) | Importe un export CSV Caisse d'Épargne (corps brut) : règles apprises puis catégories de la banque, opérations déjà importées sautées. Avec `account`, le relevé d'un livret : virements rattachés, intérêts ajoutés |
 
 Modifier la base de prod d'un bloc : lire, éditer, renvoyer avec la version lue.
 
@@ -189,7 +189,7 @@ Suivi de l'argent : ce que je gagne, mes charges (loyer, énergie, assurances…
 - **Pages** : `/apps/monnaie` (le mois, ◀ ▶ sans changer l'URL), `/annee`, `/lignes`, `/objectifs`, `/reglages` avec ses onglets `/reglages/import`, `/categories`, `/recurrents`, `/pointages`, `/donnees`.
 - **Lignes** : toutes les lignes, filtrées (texte, catégorie, période), triées, en liste ou groupées par libellé. Sélection (clic, Maj+clic, ⌘A) puis actions groupées : renommer, reclasser, regret, supprimer. « Retenir pour l'import » met aussi à jour les règles d'import.
 - **Import bancaire** (`import/`) : `caisse-epargne.ts` lit l'export CSV, `suggest.ts` propose type et catégorie (règles apprises, puis catégories de la banque). Chaque opération a un `importId` stable : réimporter une période ne crée pas de doublon. Corriger une ligne à l'import crée une règle (gérées dans les Réglages).
-- **Épargne** : le livret, avec son solde de départ dans les Réglages. Revolut est traité comme une dépense ou un revenu (catégorie « Revolut »).
+- **Épargne** : un compte par livret (Réglages > Livrets), avec son solde. Les virements du compte courant sont des lignes « Épargne » rattachées à un livret ; importer le relevé d'un livret (Import, choisir le livret) rattache ses virements aux lignes déjà là et ajoute ses intérêts. Revolut et Crédit Mutuel sont traités comme des dépenses ou des revenus (catégories du même nom).
 - **Analyses** (`insights.ts`) : ce qui revient chaque mois (même libellé, 3 mois sur 6, montant stable), prévision du solde au 31, moyenne de chaque catégorie sur les 3 mois précédents.
 - **Pointages du solde** : le solde réel saisi à une date ; le solde de chaque mois en découle, et chaque pointage est comparé au précédent pour repérer une opération manquante.
 - **Catégories perso** et **budgets par catégorie** dans les Réglages ; une ligne peut reclasser toutes celles du même libellé (et créer une règle d'import).

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { amountInput, CUSTOMIZABLE_KINDS, type Categories, type Category, type Kind, type Settings } from "../money";
-import { createCategory, createCheckpoint, updateCategoryBudgets, createGoal, createRecurring, moveMoney, removeGoal, restoreBackup, updateSettings, type FormState } from "../server/actions";
+import { createCategory, createCheckpoint, createSavingsAccount, updateCategoryBudgets, createGoal, createRecurring, moveMoney, removeGoal, restoreBackup, updateSettings, type FormState } from "../server/actions";
 import { buttonClass, squareClass } from "./kit";
 import { categoryOptions, kindOptions, Picker } from "./Picker";
 
@@ -257,6 +257,30 @@ export function CategoryForm() {
           <div>
             <button disabled={pending} className={buttonClass()}>
               <span>Créer</span>
+            </button>
+          </div>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+export function SavingsAccountForm() {
+  return (
+    <ActionForm action={createSavingsAccount} className="grid gap-4 sm:grid-cols-[5rem_1fr_auto] sm:items-end">
+      {(pending) => (
+        <>
+          <label className={labelClass}>
+            Emoji
+            <input name="emoji" maxLength={16} placeholder="🐷" className="w-full text-center" />
+          </label>
+          <label className={labelClass}>
+            Nom
+            <input name="name" required maxLength={30} placeholder="Livret A" />
+          </label>
+          <div>
+            <button disabled={pending} className={buttonClass()}>
+              <span>Ajouter</span>
             </button>
           </div>
         </>

@@ -15,6 +15,8 @@ import {
   shiftMonth,
   type CategoryTotal,
   type Ledger,
+  savingsAccountBalances,
+  monthOf,
 } from "../money";
 import { categoryAverages, forecast } from "../insights";
 import { addRecurringToMonth, showMonth } from "../server/actions";
@@ -29,6 +31,8 @@ import { BASE, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, Sta
 /** Dashboard of one month. `today` is YYYY-MM-DD. */
 export function MonthView({ ledger, month, today }: { ledger: Ledger; month: string; today: string }) {
   const stats = monthStats(ledger, month);
+  // Balance of each livret at the end of the month.
+  const livrets = savingsAccountBalances({ entries: ledger.entries.filter((e) => monthOf(e.date) <= month) });
   const previous = monthStats(ledger, shiftMonth(month, -1));
   const days = daysInMonth(month);
   const isCurrent = today.startsWith(month);
@@ -78,7 +82,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             prevLabel="Mois précédent"
             nextLabel="Mois suivant"
           />
-          <EntryDialog categories={categories} defaultDate={defaultDate} hotkey people={people} />
+          <EntryDialog categories={categories} accounts={ledger.savingsAccounts} defaultDate={defaultDate} hotkey people={people} />
         </>
       }
     >
@@ -224,8 +228,21 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
               <AnimatedMoney value={putAside} signed /> <span className="text-lg text-[var(--mn-muted)]">mis de côté</span>
             </p>
             <p className="mt-1 text-[var(--mn-muted)]">
-              Solde du livret : {formatMoney(stats.savingsBalance)}
+              {ledger.savingsAccounts.length > 1 ? "Livrets" : "Solde du livret"} : {formatMoney(stats.savingsBalance)}
+              {stats.interest > 0 && ` · +${formatMoney(stats.interest)} d'intérêts`}
             </p>
+            {ledger.savingsAccounts.length > 1 && (
+              <ul className="mt-2 grid gap-1 text-sm">
+                {ledger.savingsAccounts.map((a) => (
+                  <li key={a.id} className="flex justify-between gap-3">
+                    <span className="text-[var(--mn-muted)]">
+                      {a.emoji} {a.name}
+                    </span>
+                    <b>{formatMoney(livrets.get(a.id) ?? 0)}</b>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
         </div>
       </div>
@@ -281,7 +298,7 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
       <Panel className="mt-6 scroll-mt-6" id="journal">
         <PanelTitle aside={<Tag>{stats.entries.length} lignes</Tag>}>Le journal du mois</PanelTitle>
         {stats.entries.length ? (
-          <JournalBrowser entries={stats.entries} categories={categories} labelCounts={labelCounts} />
+          <JournalBrowser entries={stats.entries} categories={categories} accounts={ledger.savingsAccounts} labelCounts={labelCounts} />
         ) : (
           <div className="flex flex-col items-center gap-6 py-12 text-center">
             <Slab tilt={-3} className="text-4xl">

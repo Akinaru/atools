@@ -6,6 +6,7 @@ import {
   addEntry,
   deleteEntry,
   importOperations,
+  importSavingsOperations,
   LedgerError,
   ledgerVersion,
   patchEntry,
@@ -127,10 +128,15 @@ export const api: ApiRoute[] = [
     method: "POST",
     path: "import",
     description:
-      "Importe un export CSV Caisse d'Épargne (corps brut) avec les règles et catégories de la banque. ?dryRun=1 : renvoie seulement ce qui serait importé.",
+      "Importe un export CSV Caisse d'Épargne (corps brut) avec les règles et catégories de la banque. ?dryRun=1 : renvoie seulement ce qui serait importé. ?account=<id du livret> : l'export d'un livret (virements rattachés, intérêts ajoutés).",
     handler: async ({ request, url }) => {
       try {
         const operations = parseCaisseEpargneCsv(decodeBankFile(new Uint8Array(await request.arrayBuffer())));
+        const account = url.searchParams.get("account");
+        if (account) {
+          if (url.searchParams.get("dryRun")) return apiError(400, "dryRun n'existe pas pour un livret : son import ne fait que rattacher des virements et ajouter les intérêts.");
+          return json(await importSavingsOperations(account, operations));
+        }
         if (!url.searchParams.get("dryRun")) await refreshBookedDates(operations);
         const ledger = await readLedger();
         const known = new Set(ledger.entries.map((e) => e.importId).filter(Boolean));

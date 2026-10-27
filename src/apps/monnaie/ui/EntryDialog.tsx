@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { isTyping, playSound } from "@/components/console/sound";
-import { amountInput, type Categories, type Entry, type Kind } from "../money";
+import { amountInput, type Categories, type Entry, type Kind, type SavingsAccount } from "../money";
 
 const TITLES: Record<Kind, string> = { expense: "J'ai cramé…", charge: "J'ai payé…", income: "J'ai encaissé…", savings: "Épargne…", debt: "Dette…" };
 const TABS: Record<Kind, string> = { expense: "Plaisir", charge: "Charge", savings: "Épargne", debt: "Dette", income: "Revenu" };
@@ -29,12 +29,15 @@ export function EntryDialog({
   hotkey = false,
   people = [],
   categories,
+  accounts = [],
   sameLabel = 0,
 }: {
   /** Lines with the same label (this one included): offers to reclassify them all. */
   sameLabel?: number;
   /** Built-in and user categories (categoriesOf(ledger)). */
   categories: Categories;
+  /** The livrets, to pick one for a savings line. */
+  accounts?: SavingsAccount[];
   defaultDate: string;
   entry?: Entry;
   trigger?: ReactNode;
@@ -145,6 +148,22 @@ export function EntryDialog({
                 ))}
               </div>
             </fieldset>
+
+            {kind === "savings" && accounts.length > 0 && (
+              <fieldset className="grid gap-2">
+                <legend className={`${labelClass} mb-1.5`}>Livret</legend>
+                <div className="flex flex-wrap gap-2">
+                  {accounts.map((a, i) => (
+                    <label key={a.id} className="cursor-pointer">
+                      <input type="radio" name="account" value={a.id} defaultChecked={entry?.account ? entry.account === a.id : i === 0} className="peer sr-only" />
+                      <span className="inline-block border-2 border-[var(--mn-ink)] px-3 py-1.5 text-sm font-bold transition peer-checked:-rotate-2 peer-checked:bg-[var(--mn-yellow)] peer-checked:shadow-[3px_3px_0_var(--mn-ink)] peer-focus-visible:outline peer-focus-visible:outline-2">
+                        {a.emoji} {a.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
             <div className="grid grid-cols-[auto_1fr] gap-3">
               <label className={labelClass}>

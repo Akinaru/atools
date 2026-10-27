@@ -6,7 +6,8 @@ export type Cents = number;
 
 /**
  * income: money in · expense: unnecessary spending (the budget) · charge: necessary bills (rent, energy…)
- * savings: transfer between the current account and the livret ("depot" / "retrait")
+ * savings: a savings account (livret) moving: transfer with the current account ("depot" / "retrait") or
+ * interest it earned ("interets", the current account does not move)
  * debt: money owed between me and a `person` (categories below).
  */
 export type Kind = "income" | "expense" | "charge" | "savings" | "debt";
@@ -28,8 +29,12 @@ export type Entry = {
   recurringId?: string;
   /** Debt only: who I owe, or who owes me. */
   person?: string;
-  /** Set when imported from a bank export: identifies the bank operation, so it is never imported twice. */
+  /** Savings only: the savings account (SavingsAccount id); absent = not attributed yet. */
+  account?: string;
+  /** Set when imported from the current-account export: identifies the bank operation, so it is never imported twice. */
   importId?: string;
+  /** Savings only, set when matched with (or imported from) the savings account's own export: its operation id. */
+  pocketImportId?: string;
   /** Imported only: the day the bank booked it (YYYY-MM-DD), often 1 to 4 days after `date`. The balance follows it. */
   bookedDate?: string;
   createdAt: string;
@@ -62,6 +67,9 @@ export type Settings = {
   savingsStart: Cents;
 };
 
+/** A livret (Livret A, Livret Jeune…): its balance is the sum of its savings lines. */
+export type SavingsAccount = { id: string; name: string; emoji: string };
+
 /** Real current-account balance read in the bank app at the end of a day; may be negative. */
 export type Checkpoint = { id: string; date: string; balance: Cents; createdAt: string };
 
@@ -85,6 +93,7 @@ export type Ledger = {
   goals: Goal[];
   rules: ImportRule[];
   checkpoints: Checkpoint[];
+  savingsAccounts: SavingsAccount[];
   /** Categories created by the user, next to the built-in ones. */
   customCategories: CustomCategory[];
   /** Monthly budget per plaisir category id (cents); absent = no budget. */
@@ -98,6 +107,7 @@ export const EMPTY_LEDGER: Ledger = {
   goals: [],
   rules: [],
   checkpoints: [],
+  savingsAccounts: [],
   customCategories: [],
   categoryBudgets: {},
   settings: { monthlyBudget: 0, savingsStart: 0 },
@@ -152,6 +162,7 @@ export const CATEGORIES: Categories = {
   savings: [
     { id: "depot", label: "Vers le livret", emoji: "🐷" },
     { id: "retrait", label: "Depuis le livret", emoji: "🔓" },
+    { id: "interets", label: "Intérêts", emoji: "✨" },
   ],
   // dette: someone paid or lent for me (no money on my account yet) · rembourse: I pay them back.
   // pret: I paid or lent for someone · recu: they pay me back.
@@ -168,7 +179,7 @@ type Movement = Pick<Entry, "kind" | "amount" | "category">;
 /** Effect on the current account: money in is positive, money out negative, an IOU ("Je dois") 0. */
 export function signedAmount(entry: Movement): Cents {
   if (entry.kind === "income") return entry.amount;
-  if (entry.kind === "savings") return entry.category === "retrait" ? entry.amount : -entry.amount;
+  if (entry.kind === "savings") return entry.category === "retrait" ? entry.amount : entry.category === "depot" ? -entry.amount : 0;
   if (entry.kind === "debt") return entry.category === "dette" ? 0 : entry.category === "recu" ? entry.amount : -entry.amount;
   return -entry.amount;
 }
@@ -193,9 +204,26 @@ export function debtBalances(entries: Entry[]): DebtBalance[] {
     .sort((a, b) => b.iOwe + b.owesMe - (a.iOwe + a.owesMe));
 }
 
-/** Effect on the livret: a deposit is positive, a withdrawal negative, anything else 0. */
-export const savingsDelta = (entry: Movement) =>
+/** Money moved from the current account to the livrets: a deposit is positive, a withdrawal negative, anything else 0. */
+export const transferDelta = (entry: Movement) =>
   entry.kind !== "savings" ? 0 : entry.category === "depot" ? entry.amount : entry.category === "retrait" ? -entry.amount : 0;
+
+/** Effect on the livret's balance: the transfers plus the interest it earned. */
+export const savingsDelta = (entry: Movement) => transferDelta(entry) + (entry.kind === "savings" && entry.category === "interets" ? entry.amount : 0);
+
+/** "Vers le livret · Livret A": the category of a line, with its livret for a savings line. */
+export const lineCategoryLabel = (entry: Pick<Entry, "kind" | "category" | "account">, categories: Categories, accounts: SavingsAccount[]) => {
+  const label = getCategory(entry.kind, entry.category, categories).label;
+  const account = entry.kind === "savings" && accounts.find((a) => a.id === entry.account);
+  return account ? `${label} · ${account.name}` : label;
+};
+
+/** Balance of each savings account today; lines not attributed to an account are under "". */
+export function savingsAccountBalances(ledger: Pick<Ledger, "entries">): Map<string, Cents> {
+  const balances = new Map<string, Cents>();
+  for (const e of ledger.entries) if (e.kind === "savings") balances.set(e.account ?? "", (balances.get(e.account ?? "") ?? 0) + savingsDelta(e));
+  return balances;
+}
 
 
 /** Built-in categories plus the user's, inserted before "Autre" (always last). */
@@ -299,8 +327,10 @@ export type MonthStats = {
   spent: Cents;
   regret: Cents;
   charges: Cents;
-  /** Net transfers to the livret (deposits - withdrawals). */
+  /** Net transfers to the livrets (deposits - withdrawals), interest not included. */
   saved: Cents;
+  /** Interest earned by the livrets this month. */
+  interest: Cents;
   /** Savings account balance at the end of the month. */
   savingsBalance: Cents;
   /** Effect of debts on the current account (repaid, advanced, received back). */
@@ -345,7 +375,8 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
   const income = sum(entries, "income");
   const spent = sum(entries, "expense");
   const charges = sum(entries, "charge");
-  const saved = entries.reduce((n, e) => n + savingsDelta(e), 0);
+  const saved = entries.reduce((n, e) => n + transferDelta(e), 0);
+  const interest = entries.reduce((n, e) => n + savingsDelta(e) - transferDelta(e), 0);
   const debtFlow = entries.reduce((n, e) => (e.kind === "debt" ? n + signedAmount(e) : n), 0);
   const kept = income - charges - spent + debtFlow;
   const left = kept - saved;
@@ -367,6 +398,7 @@ export function monthStats(ledger: Ledger, month: string): MonthStats {
     regret: expenses.reduce((n, e) => (e.regret ? n + e.amount : n), 0),
     charges,
     saved,
+    interest,
     savingsBalance,
     accountBalance,
     debtFlow,
