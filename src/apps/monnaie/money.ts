@@ -48,6 +48,8 @@ export type Entry = {
   importId?: string;
   /** Set when matched with (or imported from) the other account's own export (livret, Revolut…): its operation id. */
   pocketImportId?: string;
+  /** Imported only: the normalized label of the bank operation (see normalizeBankLabel), what the next imports match. */
+  bankLabel?: string;
   /** Imported only: the day the bank booked it (YYYY-MM-DD), often 1 to 4 days after `date`. The balance follows it. */
   bookedDate?: string;
   createdAt: string;
@@ -115,6 +117,8 @@ export type ImportRule = {
   person?: string;
   /** Transfer rule: my other account the money goes to or comes from. */
   account?: string;
+  /** Income or spending of this other account that goes through the imported one (pro income received on the personal account). */
+  via?: string;
 };
 
 export type Ledger = {

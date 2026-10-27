@@ -1,8 +1,9 @@
-// What a bank operation becomes in Monnaie: the user's rules first, then the bank's own categories.
-// Pure functions: shared by the import screen, the Server Actions and the API.
+// What a bank operation becomes in Monnaie: the user's rules first, then what the same label became before,
+// then the bank's own categories (or the shop's name). Pure functions: shared by the import screen and the API.
 
-import { MAIN_ACCOUNT, type ImportRule, type Kind } from "../money";
-import type { BankOperation } from "./caisse-epargne";
+import type { ImportRule, Kind } from "../money";
+import { guessFromShop } from "./merchants";
+import type { BankOperation } from "./types";
 
 export type Suggestion = {
   ignore: boolean;
@@ -13,9 +14,17 @@ export type Suggestion = {
   /** Transfer: the accounts it goes from and to. */
   account?: string;
   to?: string;
-  /** Where it comes from: a learned rule, the bank categories, or nothing better. */
-  source: "rule" | "bank" | "default";
+  /** Income or spending of another account that went through the imported one (pro income received on the personal account). */
+  via?: string;
+  /** Where it comes from: a learned rule, an earlier line with the same label, the bank categories, or nothing better. */
+  source: "rule" | "history" | "bank" | "default";
 };
+
+/** What an earlier line with the same label became (see historyOf). */
+export type HistoryHit = { kind: Kind; category: string; label: string; person?: string; other?: string };
+
+/** The import being made: the current account the operations happen on, and the earlier lines by label. */
+export type SuggestContext = { account: string; history: Map<string, HistoryHit> };
 
 /** "VIR. VERS Thibaud  Evrard" -> "VERS THIBAUD EVRARD"; "Spotify P43135B" -> "SPOTIFY". Rules match on it. */
 export function normalizeBankLabel(label: string): string {
@@ -23,7 +32,7 @@ export function normalizeBankLabel(label: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toUpperCase()
-    .replace(/^(VIREMENT|VIR\.?)\s+(VERS|DE)\s+/, "$2 ")
+    .replace(/^(VIREMENT|VIR\.?)\s+(VERS|DE)\s*:?\s+/, "$2 ")
     .split(/\s+/)
     .filter((word, i) => i === 0 || !/\d/.test(word))
     .join(" ")
@@ -40,7 +49,7 @@ const ORGANIZATIONS = /^(DDFIP|DGFIP|CAF|CPAM|URSSAF|POLE EMPLOI|FRANCE TRAVAIL|
  * Money received needs a title or a first and last name, so a company name ("GENESII") is not taken for a person.
  */
 function personOf(label: string): string | undefined {
-  const normalized = normalizeBankLabel(label);
+  const normalized = normalizeBankLabel(label).replace(/^VIR (SEPA|INST) /, "").replace(/^TO /, "VERS ");
   const outgoing = normalized.startsWith("VERS ");
   const all = normalized.replace(/^(VERS|DE) /, "").split(" ");
   if (ORGANIZATIONS.test(all.join(" "))) return undefined;
@@ -113,41 +122,67 @@ function fromBank(op: BankOperation): Target | undefined {
   return undefined;
 }
 
-export function suggest(op: BankOperation, rules: ImportRule[]): Suggestion {
+/** Direction of a transfer with my `other` account: out of the imported account when the money goes out. */
+const transferWith = (other: string, ctx: SuggestContext, out: boolean) => (out ? { account: ctx.account, to: other } : { account: other, to: ctx.account });
+
+export function suggest(op: BankOperation, rules: ImportRule[], ctx: SuggestContext): Suggestion {
   const match = normalizeBankLabel(op.label);
   // An exact label rule wins over a keyword rule ("CONTABO" in "WWW CONTABO COM").
   const rule = rules.find((r) => !r.contains && r.match === match) ?? rules.find((r) => r.contains && match.includes(r.match));
   const out = op.amount < 0;
+  // A refund (money in) on a spending category is a refund, not a negative expense.
+  const signed = (kind: Kind, category: string) =>
+    !out && (kind === "expense" || kind === "charge") ? { kind: "income" as const, category: "remboursement" } : { kind, category };
 
   if (rule) {
     if (rule.ignore) return { ignore: true, kind: out ? "expense" : "income", category: "autre", label: op.label, source: "rule" };
     if (rule.kind && rule.category) {
+      const label = rule.label || op.label;
+      if (rule.kind === "transfer" && rule.account && rule.account !== ctx.account) {
+        return { ignore: false, kind: "transfer", category: "virement", label, ...transferWith(rule.account, ctx, out), source: "rule" };
+      }
       // A pocket or a debt rule keeps the direction of the money: the rule tells which pocket/person.
       let category = rule.category;
       if (rule.kind === "savings") category = out ? "depot" : "retrait";
       if (rule.kind === "debt" && (rule.category === "rembourse" || rule.category === "recu")) category = out ? "rembourse" : "recu";
-      // A transfer leaves the imported (main) account when the money goes out, and comes into it otherwise.
-      if (rule.kind === "transfer" && rule.account) {
-        const [account, to] = out ? [MAIN_ACCOUNT.id, rule.account] : [rule.account, MAIN_ACCOUNT.id];
-        return { ignore: false, kind: "transfer", category: "virement", label: rule.label || op.label, account, to, source: "rule" };
+      if (rule.kind !== "transfer") {
+        const via = rule.via && rule.via !== ctx.account ? rule.via : undefined;
+        return { ignore: false, kind: rule.kind, category, label, person: rule.person, via, source: "rule" };
       }
-      return { ignore: false, kind: rule.kind, category, label: rule.label || op.label, person: rule.person, source: "rule" };
+    }
+  }
+
+  // The same label before: the same type and category (and the same person or account).
+  const seen = ctx.history.get(match);
+  if (seen) {
+    if (seen.kind === "transfer") {
+      if (seen.other && seen.other !== ctx.account) return { ignore: false, kind: "transfer", category: "virement", label: seen.label, ...transferWith(seen.other, ctx, out), source: "history" };
+    } else if (seen.kind === "debt") {
+      return { ignore: false, kind: "debt", category: out ? "rembourse" : "recu", label: seen.label, person: seen.person, source: "history" };
+    } else if (seen.kind !== "savings") {
+      return { ignore: false, ...signed(seen.kind, seen.category), label: seen.label, source: "history" };
     }
   }
 
   // Money sent to / received from a person: a debt being settled, by default.
-  const isTransfer = op.type === "Virement" || op.type === "Virement recu";
-  if (isTransfer && op.bankCategory.startsWith("A categoriser")) {
+  const isTransfer = /^Virement/.test(op.type);
+  if (isTransfer && (!op.bankCategory || op.bankCategory.startsWith("A categoriser"))) {
     const person = personOf(op.label);
     if (person) return { ignore: false, kind: "debt", category: out ? "rembourse" : "recu", label: op.label, person, source: "bank" };
   }
-  if (op.type === "Retrait d'especes") return { ignore: false, kind: "expense", category: "autre", label: "ESPÈCES", source: "bank" };
+  if (op.type === "Retrait d'especes" || /^RETRAIT DAB/.test(match)) return { ignore: false, kind: "expense", category: "autre", label: "ESPÈCES", source: "bank" };
 
-  const bank = fromBank(op);
-  // A refund (money in) on a spending category is a refund, not a negative expense.
-  if (bank && !bank.ignore && !out && bank.kind !== "income" && bank.kind !== "savings") {
-    return { ignore: false, kind: "income", category: "remboursement", label: op.label, source: "bank" };
-  }
-  if (bank) return { ignore: !!bank.ignore, kind: bank.kind, category: bank.category, label: op.label, source: "bank" };
+  const bank = fromBank(op) ?? fromOtherBanks(op, match);
+  if (bank) return { ignore: !!bank.ignore, ...(bank.ignore || bank.kind === "income" || bank.kind === "savings" ? bank : signed(bank.kind, bank.category)), label: op.label, source: "bank" };
   return { ignore: false, kind: out ? "expense" : "income", category: "autre", label: op.label, source: "default" };
+}
+
+/** Exports without bank categories: fees, refunds and cashback by their type, then the shop's name. */
+function fromOtherBanks(op: BankOperation, match: string): Target | undefined {
+  if (/^Frais|^F (COTIS|COMM|FRAIS|INT)|^FRAIS|^COMPTE JEUNE/.test(op.type || match)) return { kind: "charge", category: "banque" };
+  if (/^(F |FRAIS )/.test(match)) return { kind: "charge", category: "banque" };
+  if (op.type === "Remboursement sur carte") return { kind: "income", category: "remboursement" };
+  if (op.type === "CASHBACK") return { kind: "income", category: "autre" };
+  if (/^(Paiement par carte|Carte)$/.test(op.type)) return guessFromShop(op.label) ?? { kind: "expense", category: "autre" };
+  return guessFromShop(op.label);
 }

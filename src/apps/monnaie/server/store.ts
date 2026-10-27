@@ -378,124 +378,114 @@ export function saveSettings(settings: Settings): Promise<void> {
 
 // --- Bank import ---
 
-const IMPORT_ID = /^[a-z]{2,8}:[0-9a-f]{24}$/;
+const IMPORT_ID = /^[a-z]{2,8}:[0-9a-f]{24,40}(:via)?$/;
 
 /** One reviewed bank operation, as sent back by the import screen (untrusted). */
 export type ImportRow = EntryInput & {
   importId: unknown;
+  /** add: a new line · link: the other side of `twin`, already recorded · ignore: nothing. */
+  action: unknown;
+  twin?: unknown;
   /** Day the bank booked it (YYYY-MM-DD). */
   bookedDate?: unknown;
-  ignore?: unknown;
+  /** Income or spending of this other account that went through the imported one. */
+  via?: unknown;
   /** Learn a rule from this row for the next imports. */
   remember?: unknown;
   /** Normalized bank label the rule matches. */
   match?: unknown;
 };
 
+export type ImportResult = { added: number; linked: number; ignored: number; skipped: number; rules: number };
+
 /**
- * Adds the reviewed operations that are not imported yet (same importId) and saves the rules to remember.
- * Validates every row like a hand-typed entry; nothing is written if one row is invalid.
+ * Writes a reviewed import into one account (`target`): new lines, links to the lines recorded from the other side
+ * (the operation id is added to them), rules to remember. `start` is the balance before the first operation, set on
+ * an account's first import. Every row is validated; nothing is written if one is invalid.
  */
-export function importOperations(rows: ImportRow[]): Promise<{ added: number; skipped: number; rules: number }> {
+export function applyImport(target: { type: "account" | "livret"; id: string }, rows: ImportRow[], start?: number): Promise<ImportResult> {
   const now = new Date().toISOString();
   return update((ledger) => {
     const categories = categoriesOf(ledger);
-    const checked = rows.map((row, i) => {
-      if (typeof row.importId !== "string" || !IMPORT_ID.test(row.importId)) throw new LedgerError(`Ligne ${i + 1} : identifiant d'import invalide.`);
-      const rule = row.remember === true && typeof row.match === "string" && row.match.trim() ? row.match.trim().slice(0, 120) : undefined;
-      if (row.ignore === true) return { importId: row.importId, ignore: true as const, rule: rule ? { match: rule, ignore: true } : undefined };
+    const isLivret = target.type === "livret";
+    if (isLivret ? !ledger.savingsAccounts.some((a) => a.id === target.id) : !currentAccounts(ledger).some((a) => a.id === target.id)) {
+      throw new LedgerError(isLivret ? "Livret inconnu." : "Compte inconnu.");
+    }
+    const known = new Set(ledger.entries.flatMap((e) => [e.importId, e.pocketImportId].filter(Boolean)));
+    const result: ImportResult = { added: 0, linked: 0, ignored: 0, skipped: 0, rules: 0 };
+    const additions: Entry[] = [];
+    const links: [Entry, string][] = [];
+    const learned: ImportRule[] = [];
+
+    rows.forEach((row, i) => {
+      const fail = (message: string): never => {
+        throw new LedgerError(`Ligne ${i + 1} : ${message}`);
+      };
+      if (typeof row.importId !== "string" || !IMPORT_ID.test(row.importId)) fail("identifiant d'import invalide.");
+      const importId = row.importId as string;
+      if (known.has(importId)) return void result.skipped++;
+      const match = row.remember === true && typeof row.match === "string" && row.match.trim() ? row.match.trim().slice(0, 120) : undefined;
+      // Every row sends its bank label (what the rule would match), remembered or not.
+      if (row.action === "ignore") {
+        result.ignored++;
+        if (match) learned.push({ match, ignore: true });
+        return;
+      }
+      if (row.action === "link") {
+        const twin = ledger.entries.find((e) => e.id === row.twin);
+        if (!twin || (twin.importId && twin.pocketImportId)) fail("la ligne à rattacher n'est plus libre, relance l'analyse.");
+        links.push([twin!, importId]);
+        return;
+      }
+      if (row.action !== "add") fail("action inconnue.");
       try {
-        const entry = checkEntry(row, ledger, categories);
-        // A transfer rule keeps my other account (the side that is not the imported one).
-        const other = entry.kind === "transfer" ? (entry.account ?? entry.to) : undefined;
-        const learned: ImportRule | undefined = rule
-          ? { match: rule, kind: entry.kind, category: entry.category, label: entry.label, person: entry.person, account: other }
-          : undefined;
+        // The operation happens on the imported account: a livret move keeps its current-account side.
+        const input: EntryInput = isLivret
+          ? { ...row, kind: "savings", livret: target.id, account: row.account || MAIN_ACCOUNT.id }
+          : row.kind === "transfer" || row.kind === "savings"
+            ? row
+            : { ...row, account: target.id };
+        const entry = checkEntry(input, ledger, categories);
+        if (!isLivret && entry.kind === "transfer" && accountOf(entry) !== target.id && entry.to !== target.id) fail("le virement doit passer par ce compte.");
+        if (!isLivret && entry.kind === "savings" && accountOf(entry) !== target.id) fail("l'épargne doit passer par ce compte.");
         const bookedDate = typeof row.bookedDate === "string" && isValidDate(row.bookedDate) ? row.bookedDate : undefined;
-        return { importId: row.importId, ignore: false as const, entry, bookedDate, rule: learned };
+        const ids = isLivret ? { pocketImportId: importId } : { importId };
+        const bankLabel = typeof row.match === "string" && row.match ? row.match.slice(0, 120) : undefined;
+        const via = typeof row.via === "string" && row.via && row.via !== target.id && !isLivret && ["income", "expense", "charge"].includes(entry.kind) ? row.via : undefined;
+        if (via) {
+          if (!currentAccounts(ledger).some((a) => a.id === via)) fail("compte inconnu.");
+          // Recorded on its own account, then the money passes through the imported one.
+          const own = { ...entry, account: via === MAIN_ACCOUNT.id ? undefined : via };
+          const [from, to] = entry.kind === "income" ? [via, target.id] : [target.id, via];
+          const pass = { ...entry, kind: "transfer" as const, category: "virement", regret: false, person: undefined, account: from === MAIN_ACCOUNT.id ? undefined : from, to };
+          additions.push({ id: randomUUID(), ...own, importId, bankLabel, bookedDate, createdAt: now }, { id: randomUUID(), ...pass, pocketImportId: `${importId}:via`, bookedDate, createdAt: now });
+        } else {
+          additions.push({ id: randomUUID(), ...entry, ...ids, bankLabel, bookedDate, createdAt: now });
+        }
+        result.added++;
+        if (match) {
+          const other = entry.kind === "transfer" ? (accountOf(entry) === target.id ? entry.to : accountOf(entry)) : undefined;
+          learned.push({ match, kind: entry.kind, category: entry.category, label: entry.label, person: entry.person, account: other, via });
+        }
       } catch (error) {
-        if (error instanceof LedgerError) throw new LedgerError(`Ligne ${i + 1} : ${error.message}`);
+        if (error instanceof LedgerError && !error.message.startsWith("Ligne ")) fail(error.message);
         throw error;
       }
     });
 
-    const known = new Set(ledger.entries.map((e) => e.importId).filter(Boolean));
-    let added = 0;
-    let skipped = 0;
-    for (const row of checked) {
-      if (row.ignore) continue;
-      if (known.has(row.importId)) {
-        skipped++;
-        continue;
-      }
-      known.add(row.importId);
-      // A transfer already brought in by the livret's own export: the same line, now seen from the current account.
-      const twin = row.entry.kind === "savings" || row.entry.kind === "transfer" ? findTransfer(ledger.entries, row.entry, (e) => !e.importId && !!e.pocketImportId) : undefined;
-      if (twin) {
-        Object.assign(twin, { importId: row.importId, bookedDate: row.bookedDate });
-        skipped++;
-        continue;
-      }
-      ledger.entries.push({ id: randomUUID(), ...row.entry, importId: row.importId, bookedDate: row.bookedDate, createdAt: now });
-      added++;
+    for (const [twin, importId] of links) {
+      // The side that was missing gets this operation's id; a livret move learns its livret.
+      if (twin.importId) twin.pocketImportId = importId;
+      else twin.importId = importId;
+      if (isLivret && twin.kind === "savings") twin.livret = target.id;
+      result.linked++;
     }
-    const rules = checked.flatMap((row) => (row.rule ? [row.rule] : []));
-    for (const rule of rules) ledger.rules = [...ledger.rules.filter((r) => r.match !== rule.match), rule];
-    return { added, skipped, rules: rules.length };
-  });
-}
-
-/**
- * The same transfer (kind, direction and amount) a few days apart at most: banks book both sides on different days.
- * `target` is a savings line (direction in its category) or a transfer between two current accounts.
- */
-function findTransfer(entries: Entry[], target: Pick<Entry, "category" | "amount" | "date"> & Partial<Pick<Entry, "kind" | "account" | "to">>, eligible: (e: Entry) => boolean) {
-  const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / 86_400_000;
-  const kind = target.kind ?? "savings";
-  const sameSides = (e: Entry) => kind !== "transfer" || (accountOf(e) === accountOf(target) && e.to === target.to);
-  return entries
-    .filter((e) => e.kind === kind && e.category === target.category && e.amount === target.amount && sameSides(e) && Math.abs(day(e.date) - day(target.date)) <= 4 && eligible(e))
-    .sort((a, b) => Math.abs(day(a.date) - day(target.date)) - Math.abs(day(b.date) - day(target.date)))[0];
-}
-
-/**
- * Imports a livret's own export into savings account `accountId`. Each transfer is matched with the line already
- * imported from the current account (it gets attributed to this livret); interest becomes a new line; a transfer
- * not found yet is added (the current-account import will match it later).
- */
-export function importSavingsOperations(
-  accountId: string,
-  operations: { importId: string; date: string; label: string; amount: number }[],
-): Promise<{ linked: number; added: number; interest: number; skipped: number }> {
-  return update((ledger) => {
-    const account = ledger.savingsAccounts.find((a) => a.id === accountId);
-    if (!account) throw new LedgerError("Livret inconnu.");
-    const known = new Set(ledger.entries.map((e) => e.pocketImportId).filter(Boolean));
-    const result = { linked: 0, added: 0, interest: 0, skipped: 0 };
-    const now = new Date().toISOString();
-    for (const op of operations) {
-      if (known.has(op.importId)) {
-        result.skipped++;
-        continue;
-      }
-      if (!Number.isInteger(op.amount) || op.amount === 0 || !isValidDate(op.date)) throw new LedgerError("Opération invalide.");
-      known.add(op.importId);
-      const base = { amount: Math.abs(op.amount), date: op.date, note: "", regret: false, livret: account.id, pocketImportId: op.importId, createdAt: now };
-      if (/^INTERETS\b/i.test(normalizeBankLabel(op.label)) && op.amount > 0) {
-        ledger.entries.push({ id: randomUUID(), kind: "savings", category: "interets", label: toLabel(`INTÉRÊTS ${account.name}`), ...base });
-        result.interest++;
-        continue;
-      }
-      // Money in on the livret is a deposit from the current account.
-      const category = op.amount > 0 ? "depot" : "retrait";
-      const twin = findTransfer(ledger.entries, { category, amount: Math.abs(op.amount), date: op.date }, (e) => !e.pocketImportId && (!e.livret || e.livret === account.id));
-      if (twin) {
-        Object.assign(twin, { livret: account.id, pocketImportId: op.importId });
-        result.linked++;
-      } else {
-        ledger.entries.push({ id: randomUUID(), kind: "savings", category, label: toLabel(op.label), ...base });
-        result.added++;
-      }
+    ledger.entries.push(...additions);
+    for (const rule of learned) ledger.rules = [...ledger.rules.filter((r) => r.match !== rule.match), rule];
+    result.rules = learned.length;
+    if (start !== undefined && Number.isInteger(start) && Math.abs(start) <= MAX_AMOUNT) {
+      const account = isLivret ? ledger.savingsAccounts.find((a) => a.id === target.id) : ledger.accounts.find((a) => a.id === target.id);
+      if (account && account.start === undefined) account.start = start;
     }
     return result;
   });

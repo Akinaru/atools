@@ -1,12 +1,12 @@
 import { apiError, json, type ApiRoute } from "@/lib/api";
 import { byDateDesc, categoriesOf, getCategory, KIND_LABELS, MONTH_PATTERN, monthStats, signedAmount, type Categories, type CategoryTotal, type Entry } from "./money";
-import { BankFileError, decodeBankFile, parseCaisseEpargneCsv } from "./import/caisse-epargne";
-import { normalizeBankLabel, suggest } from "./import/suggest";
+import { parseBankFile } from "./import/banks";
+import { BankFileError, decodeBankFile } from "./import/csv";
+import { planImport, resolveTarget, rowsAsSuggested } from "./import/plan";
 import {
   addEntry,
   deleteEntry,
-  importOperations,
-  importSavingsOperations,
+  applyImport,
   LedgerError,
   ledgerVersion,
   patchEntry,
@@ -128,46 +128,23 @@ export const api: ApiRoute[] = [
     method: "POST",
     path: "import",
     description:
-      "Importe un export CSV Caisse d'Épargne (corps brut) avec les règles et catégories de la banque. ?dryRun=1 : renvoie seulement ce qui serait importé. ?account=<id du livret> : l'export d'un livret (virements rattachés, intérêts ajoutés).",
+      "Importe un export bancaire (corps brut : CSV Caisse d'Épargne, Revolut ou Crédit Mutuel) tel que suggéré : nouvelles lignes ajoutées, virements déjà vus de l'autre compte rattachés. ?account=account:<id> ou livret:<id> (sinon deviné d'après la banque). ?dryRun=1 : renvoie seulement le plan.",
     handler: async ({ request, url }) => {
       try {
-        const operations = parseCaisseEpargneCsv(decodeBankFile(new Uint8Array(await request.arrayBuffer())));
-        const account = url.searchParams.get("account");
-        if (account) {
-          if (url.searchParams.get("dryRun")) return apiError(400, "dryRun n'existe pas pour un livret : son import ne fait que rattacher des virements et ajouter les intérêts.");
-          return json(await importSavingsOperations(account, operations));
-        }
-        if (!url.searchParams.get("dryRun")) await refreshBookedDates(operations);
-        const ledger = await readLedger();
-        const known = new Set(ledger.entries.map((e) => e.importId).filter(Boolean));
-        const rows = operations
-          .filter((op) => !known.has(op.importId))
-          .map((op) => {
-            const s = suggest(op, ledger.rules);
-            return { op, s };
-          });
-        if (url.searchParams.get("dryRun")) {
+        const bank = parseBankFile(decodeBankFile(new Uint8Array(await request.arrayBuffer())));
+        const dryRun = !!url.searchParams.get("dryRun");
+        const target = resolveTarget(await readLedger(), bank, url.searchParams.get("account") ?? "");
+        if (!dryRun && bank.bank === "caisse-epargne" && target.type === "account") await refreshBookedDates(bank.operations);
+        const plan = planImport(await readLedger(), bank, target);
+        const count = (status: string) => plan.rows.filter((r) => r.status === status).length;
+        const summary = { bank: bank.bankName, target, from: plan.from, to: plan.to, known: count("known"), twins: count("twin"), new: count("new"), balanceBefore: plan.balanceBefore, fileBalance: plan.fileBalance };
+        if (dryRun) {
           return json({
-            alreadyImported: operations.length - rows.length,
-            rows: rows.map(({ op, s }) => ({ date: op.date, bankLabel: op.label, match: normalizeBankLabel(op.label), amount: op.amount, ...s })),
+            ...summary,
+            rows: plan.rows.filter((r) => r.status !== "known").map((r) => ({ date: r.date, bankLabel: r.label, match: r.match, amount: r.amount, status: r.status, twin: r.twin, ...r.suggestion })),
           });
         }
-        const result = await importOperations(
-          rows.map(({ op, s }) => ({
-            importId: op.importId,
-            ignore: s.ignore,
-            kind: s.kind,
-            category: s.category,
-            label: s.label,
-            person: s.person,
-            account: s.account,
-            to: s.to,
-            amount: Math.abs(op.amount),
-            date: op.date,
-            bookedDate: op.bookedDate,
-          })),
-        );
-        return json({ ...result, alreadyImported: operations.length - rows.length });
+        return json({ ...summary, ...(await applyImport(target, rowsAsSuggested(plan), plan.start ?? undefined)) });
       } catch (error) {
         if (error instanceof BankFileError || error instanceof LedgerError) return apiError(400, error.message);
         throw error;

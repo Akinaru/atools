@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { accountBalanceAt, accountFlow, categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, savingsAccountBalances, type Ledger } from "../money";
+import { accountBalanceAt, accountFlow, accountNamesOf, categoriesOf, checkpointChecks, formatDay, formatMoney, formatSigned, getCategory, KIND_LABELS, savingsAccountBalances, type Ledger } from "../money";
 import { removeCategory, removeCheckpoint, removeCurrentAccount, removeRecurring, removeRule, removeSavingsAccount } from "../server/actions";
 import { CategoryBudgetsForm, CategoryForm, CheckpointForm, CurrentAccountForm, RecurringForm, RestoreForm, SavingsAccountForm, SettingsForm } from "./forms";
 import { ImportClient } from "./ImportClient";
@@ -149,7 +149,7 @@ const TABS: Record<SettingsTab, (ledger: Ledger, today: string) => ReactNode> = 
   },
   import: (ledger) => (
     <>
-      <ImportClient accounts={ledger.savingsAccounts} />
+      <ImportClient names={accountNamesOf(ledger)} />
           <Panel>
             <PanelTitle aside={<Tag>{ledger.rules.length}</Tag>}>Règles d&apos;import</PanelTitle>
             {ledger.rules.length ? (

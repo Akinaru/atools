@@ -4,9 +4,10 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { VIEW_COOKIES } from "./view";
-import { BankFileError, decodeBankFile, parseCaisseEpargneCsv, type BankOperation } from "../import/caisse-epargne";
-import { normalizeBankLabel, suggest, type Suggestion } from "../import/suggest";
-import { categoriesOf, MONTH_PATTERN, parseAmount, parseOptionalAmount, type Categories, type Kind } from "../money";
+import { parseBankFile } from "../import/banks";
+import { BankFileError, decodeBankFile } from "../import/csv";
+import { planImport, resolveTarget, type ImportPlan } from "../import/plan";
+import { accountNamesOf, categoriesOf, MONTH_PATTERN, parseAmount, parseOptionalAmount, type AccountNames, type Categories, type Kind } from "../money";
 import {
   addEntry,
   addGoal,
@@ -14,7 +15,6 @@ import {
   deleteSavingsAccount,
   addCurrentAccount,
   deleteCurrentAccount,
-  importSavingsOperations,
   bulkDeleteEntries,
   bulkEditEntries,
   type BulkPatch,
@@ -29,7 +29,8 @@ import {
   deleteRule,
   recategorizeLabel,
   saveCategoryBudgets,
-  importOperations,
+  applyImport,
+  type ImportResult,
   deleteRecurring,
   editEntry,
   LedgerError,
@@ -179,39 +180,34 @@ export async function removeCheckpoint(id: string) {
 
 // --- Bank import ---
 
-/** A bank operation with what Monnaie suggests to make of it. */
-export type PreviewRow = BankOperation & { suggestion: Suggestion; match: string };
-export type PreviewState = { error?: string; message?: string; fileName?: string; rows?: PreviewRow[]; alreadyImported?: number; categories?: Categories };
+export type PreviewState = {
+  error?: string;
+  fileName?: string;
+  bankName?: string;
+  /** "account:<id>" or "livret:<id>". */
+  target?: string;
+  targetName?: string;
+  plan?: ImportPlan;
+  categories?: Categories;
+  names?: AccountNames;
+};
 
 const MAX_IMPORT_SIZE = 5 * 1024 * 1024;
 
-/** Reads the uploaded bank export and returns the operations not imported yet, with suggestions. */
+/** Reads an uploaded bank export (any supported bank) and plans its import into the account chosen or guessed. */
 export async function previewImport(_prev: PreviewState, formData: FormData): Promise<PreviewState> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choisis le fichier CSV exporté depuis ta banque." };
   if (file.size > MAX_IMPORT_SIZE) return { error: "Fichier trop gros (5 Mo max)." };
   try {
-    const operations = parseCaisseEpargneCsv(decodeBankFile(new Uint8Array(await file.arrayBuffer())));
-    // A livret's export: nothing to review, its transfers are matched with the current account's lines.
-    const account = text(formData, "account");
-    if (account) {
-      const { linked, added, interest, skipped } = await importSavingsOperations(account, operations);
-      refresh();
-      const parts = [`${linked} virement${linked > 1 ? "s" : ""} rattaché${linked > 1 ? "s" : ""}`, `${interest} ligne${interest > 1 ? "s" : ""} d'intérêts`];
-      if (added) parts.push(`${added} virement${added > 1 ? "s" : ""} pas encore vu${added > 1 ? "s" : ""} sur le compte courant, ajouté${added > 1 ? "s" : ""}`);
-      if (skipped) parts.push(`${skipped} déjà là`);
-      return { fileName: file.name, message: `${parts.join(" · ")}.` };
-    }
-    await refreshBookedDates(operations);
+    const bank = parseBankFile(decodeBankFile(new Uint8Array(await file.arrayBuffer())));
+    const target = resolveTarget(await readLedger(), bank, text(formData, "target"));
+    // The Caisse d'Épargne export also fixes the booking day of lines imported before.
+    if (bank.bank === "caisse-epargne" && target.type === "account") await refreshBookedDates(bank.operations);
     const ledger = await readLedger();
-    const known = new Set(ledger.entries.map((e) => e.importId).filter(Boolean));
-    const fresh = operations.filter((op) => !known.has(op.importId));
-    return {
-      fileName: file.name,
-      alreadyImported: operations.length - fresh.length,
-      categories: categoriesOf(ledger),
-      rows: fresh.map((op) => ({ ...op, match: normalizeBankLabel(op.label), suggestion: suggest(op, ledger.rules) })),
-    };
+    const names = accountNamesOf(ledger);
+    const targetName = (target.type === "livret" ? names.livrets : names.accounts).find((a) => a.id === target.id)?.name;
+    return { fileName: file.name, bankName: bank.bankName, target: `${target.type}:${target.id}`, targetName, plan: planImport(ledger, bank, target), categories: categoriesOf(ledger), names };
   } catch (error) {
     if (error instanceof BankFileError || error instanceof LedgerError) return { error: error.message };
     throw error;
@@ -219,21 +215,21 @@ export async function previewImport(_prev: PreviewState, formData: FormData): Pr
 }
 
 /** Saves the reviewed operations (sent as JSON by the import screen). */
-export async function commitImport(_prev: FormState, formData: FormData): Promise<FormState> {
+export async function commitImport(_prev: FormState, formData: FormData): Promise<FormState & { result?: ImportResult }> {
   let rows: unknown;
   try {
     rows = JSON.parse(text(formData, "rows"));
   } catch {
     return { error: "Import illisible, recommence." };
   }
+  const [type, id] = text(formData, "target").split(":");
+  if ((type !== "account" && type !== "livret") || !id) return { error: "Compte manquant, recommence." };
   if (!Array.isArray(rows) || rows.length === 0) return { error: "Rien à importer." };
+  const start = text(formData, "start") ? Number(text(formData, "start")) : undefined;
   try {
-    const { added, skipped, rules } = await importOperations(rows);
+    const result = await applyImport({ type, id }, rows, start);
     refresh();
-    const parts = [`${added} ligne${added > 1 ? "s" : ""} importée${added > 1 ? "s" : ""}`];
-    if (skipped) parts.push(`${skipped} déjà là`);
-    if (rules) parts.push(`${rules} règle${rules > 1 ? "s" : ""} retenue${rules > 1 ? "s" : ""}`);
-    return { message: `${parts.join(" · ")}.`, ok: Date.now() };
+    return { ok: Date.now(), result };
   } catch (error) {
     if (error instanceof LedgerError) return { error: error.message };
     throw error;
