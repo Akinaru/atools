@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { appDataDir } from "@/lib/storage";
 import { normalizeBankLabel } from "../import/suggest";
 import {
@@ -26,6 +26,12 @@ const file = () => appDataDir(SLUG, "ledger.json");
 
 /** Invalid input; its message is safe to show to the user / API client. */
 export class LedgerError extends Error {}
+
+/** The data changed since the version the caller read: nothing was written. */
+export class VersionConflictError extends LedgerError {}
+
+/** Fingerprint of the data, to detect a change between a read and a write (ETag of the backup). */
+export const ledgerVersion = (ledger: Ledger) => createHash("sha256").update(JSON.stringify(ledger)).digest("hex").slice(0, 32);
 
 export async function readLedger(): Promise<Ledger> {
   try {
@@ -135,6 +141,21 @@ export function editEntry(id: string, input: EntryInput): Promise<Entry> {
     const entry = ledger.entries.find((e) => e.id === id);
     if (!entry) throw new LedgerError("Ligne introuvable.");
     // A date changed by hand no longer matches the bank's booking day.
+    if (checked.date !== entry.date) delete entry.bookedDate;
+    Object.assign(entry, checked);
+    return entry;
+  });
+}
+
+/** Changes some fields of a line (the others are kept), validated like a full edit. */
+export function patchEntry(id: string, patch: Partial<EntryInput>): Promise<Entry> {
+  return update((ledger) => {
+    const entry = ledger.entries.find((e) => e.id === id);
+    if (!entry) throw new LedgerError("Ligne introuvable.");
+    const fields = ["kind", "amount", "label", "category", "date", "note", "regret", "person"] as const;
+    const input: EntryInput = { kind: entry.kind, amount: entry.amount, label: entry.label, category: entry.category, date: entry.date, note: entry.note, regret: entry.regret, person: entry.person };
+    for (const key of fields) if (key in patch) input[key] = patch[key];
+    const checked = checkEntry(input, categoriesOf(ledger));
     if (checked.date !== entry.date) delete entry.bookedDate;
     Object.assign(entry, checked);
     return entry;
@@ -323,7 +344,7 @@ export function deleteRule(match: string): Promise<void> {
  * Replaces the whole ledger with a backup file. The current file is kept next to it first
  * (ledger.before-restore-<date>.json), so a wrong restore can be undone by hand.
  */
-export function restoreLedger(raw: string): Promise<number> {
+export function restoreLedger(raw: string, expectedVersion?: string): Promise<number> {
   let data: Partial<Ledger>;
   try {
     data = JSON.parse(raw);
@@ -335,6 +356,10 @@ export function restoreLedger(raw: string): Promise<number> {
   }
   const entries = data.entries;
   return update((ledger) => {
+    // Written by someone else (the app, another script) since the caller's read: refuse rather than overwrite.
+    if (expectedVersion && ledgerVersion(ledger) !== expectedVersion) {
+      throw new VersionConflictError("Les données ont changé depuis ta lecture : relis la sauvegarde et refais ta modification.");
+    }
     const previous = structuredClone(ledger);
     Object.assign(ledger, structuredClone(EMPTY_LEDGER), data);
     return previous;

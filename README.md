@@ -123,11 +123,22 @@ Montants en **centimes** (entiers).
 | --- | --- | --- |
 | GET | `/entries` (`?month=AAAA-MM`, `?kind=income\|expense`) | Lignes, les plus récentes d'abord |
 | POST | `/entries` | Ajoute une ligne : `{ kind, amount, label, category, date, note?, regret? }`. `kind` : `income`, `expense` (plaisir), `charge` (loyer, énergie…) `savings` (livret, `category` = `depot` ou `retrait`) ou `debt` (`person` requis, `category` = `dette`, `rembourse`, `pret` ou `recu`) |
+| PATCH | `/entries/:id` | Modifie une ligne : seuls les champs envoyés changent, puis la ligne est revalidée |
 | DELETE | `/entries/:id` | Supprime une ligne |
 | GET | `/months/:month` | Bilan du mois : encaissé, charges, cramé, livret (net et solde), reste, budget, par catégorie |
 | GET | `/export.csv` | Toutes les lignes en CSV |
-| GET | `/backup.json` | Sauvegarde complète, à restaurer depuis les Réglages |
+| GET | `/backup.json` | Sauvegarde complète. L'en-tête `ETag` donne sa version |
+| PUT | `/backup.json` | Remplace toute la base. `If-Match: <ETag lu>` obligatoire (428 sans, 412 si la base a changé depuis). L'ancienne base est gardée dans `data/monnaie/ledger.before-restore-*.json` |
 | POST | `/import` (`?dryRun=1`) | Importe un export CSV Caisse d'Épargne (corps brut) : règles apprises puis catégories de la banque, opérations déjà importées sautées |
+
+Modifier la base de prod d'un bloc : lire, éditer, renvoyer avec la version lue.
+
+```bash
+curl -sD headers.txt -H "Authorization: Bearer $ATOOLS_API_KEY" https://atools.akinaru.fr/api/monnaie/backup.json -o ledger.json
+# … éditer ledger.json …
+curl -X PUT -H "Authorization: Bearer $ATOOLS_API_KEY" -H "If-Match: $(grep -i '^etag' headers.txt | cut -d' ' -f2 | tr -d '\r')" \
+  --data-binary @ledger.json https://atools.akinaru.fr/api/monnaie/backup.json
+```
 
 ## Déploiement (Coolify)
 
