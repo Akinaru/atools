@@ -58,7 +58,7 @@ export function ImportClient({ names }: { names: AccountNames }) {
   const [target, setTarget] = useState("");
   return (
     <div className="grid gap-10">
-      <form action={previewAction} className="mn-shape mn-paper mn-drop grid gap-4 p-6 sm:p-8" style={{ "--mn-tilt": "-0.8deg" } as CSSProperties}>
+      <form action={previewAction} className="mn-shape mn-paper mn-drop relative z-20 grid gap-4 p-6 sm:p-8" style={{ "--mn-tilt": "-0.8deg" } as CSSProperties}>
         <span className="text-sm font-semibold tracking-wide text-zinc-500">[1 · Ton relevé]</span>
         <p className="max-w-3xl text-zinc-700">
           Dépose l&apos;export CSV d&apos;un compte : <b>Caisse d&apos;Épargne</b> (compte ou livret), <b>Revolut</b> (relevé Excel, perso ou Pro) ou{" "}
