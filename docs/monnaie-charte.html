@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monnaie · Charte graphique</title>
+<meta name="description" content="Charte graphique de Monnaie : logo, icône, couleurs, typo, formes, composants, embeds de partage et ton.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800&family=Lilita+One&display=swap" rel="stylesheet">
+<!--
+  MONNAIE · CHARTE GRAPHIQUE (proposition)
+  Fichier autonome : ouvre-le dans un navigateur. Tout est en HTML/CSS/SVG inline, aucune image externe.
+  Le CSS reprend les tokens de l'app (src/apps/monnaie/ui/monnaie.css) pour que ce qui est montré ici
+  soit ce que l'app affiche vraiment.
+-->
+<style>
+:root {
+  --accent: #ff7a2f;
+  --bg: #15161f;
+  --panel: #262838;
+  --panel-2: #33364a;
+  --ghost: #454860;
+  --muted: #8f93a5;
+  --ink: #11121a;
+  --red: #f6556d;
+  --yellow: #fec83e;
+  --blue: #7cc4ff;
+  --green: #5ee08a;
+  --paper: #ffffff;
+  --cut: polygon(1.2% 2.5%, 98.8% 0%, 96.8% 97.5%, 2.5% 100%);
+  --blobs: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900' viewBox='0 0 900 900'%3E%3Cg fill='%230f1017'%3E%3Cpath d='M120 80c90-40 210-10 240 60s-30 120-110 150-170 10-200-60-20-110 70-150z'/%3E%3Cpath d='M620 60c70 10 160 70 170 150s-70 110-150 100-140-60-140-130 50-130 120-120z'/%3E%3Cpath d='M470 420c110-30 250 20 270 110s-90 170-200 170-210-50-210-140 30-110 140-140z'/%3E%3Cpath d='M60 560c60-30 170-20 190 50s-40 140-110 150-130-30-140-90 0-90 60-110z'/%3E%3C/g%3E%3Cg fill='%230c0d13'%3E%3Cpath d='M300 300c50-20 120 0 130 50s-40 80-90 80-80-30-80-70 0-50 40-60z'/%3E%3Cpath d='M760 700c40-10 90 20 90 60s-40 60-80 60-60-30-60-60 10-50 50-60z'/%3E%3C/g%3E%3C/svg%3E");
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  overflow-x: hidden;
+  color: #fff;
+  background: var(--blobs) 0 0 / 900px 900px repeat, var(--bg);
+  font: 500 16px/1.55 Barlow, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+.punch { font-family: "Lilita One", sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: .01em; line-height: .95; }
+.title { -webkit-text-stroke: .16em var(--panel-2); paint-order: stroke fill; text-shadow: .04em .06em 0 var(--ink); }
+.tag { font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+.tag::before { content: "["; } .tag::after { content: "]"; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+/* Shapes cut by hand, that boil */
+@keyframes boil {
+  0%, 100% { clip-path: polygon(1.2% 2.5%, 98.8% 0%, 96.8% 97.5%, 2.5% 100%); }
+  25% { clip-path: polygon(.6% 4.4%, 99.4% 1.9%, 98.1% 98.8%, 2.5% 95.6%); }
+  50% { clip-path: polygon(0% 5.6%, 98.8% .6%, 96.8% 99.4%, 3.8% 94.4%); }
+  75% { clip-path: polygon(1.2% 3.8%, 100% 1.2%, 96.2% 98.1%, 1.9% 96.2%); }
+}
+@keyframes drop { from { opacity: 0; transform: translateY(-1rem) rotate(var(--tilt, 0deg)) scale(1.05); } to { opacity: 1; transform: rotate(var(--tilt, 0deg)); } }
+@keyframes slam { 0% { transform: scale(2.4) rotate(-14deg); opacity: 0; } 60% { transform: scale(.92) rotate(-5deg); opacity: 1; } 100% { transform: scale(1) rotate(-6deg); } }
+.shape { position: relative; isolation: isolate; }
+.shape::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--shape, #fff); clip-path: var(--cut); }
+.boil::before { animation: boil .45s steps(4, end) infinite; }
+.paper { --shape: #fff; color: var(--ink); filter: drop-shadow(.45rem .6rem 0 rgba(0,0,0,.6)); }
+.panel { --shape: var(--panel); }
+.slab { --shape: var(--accent); color: var(--ink); display: inline-block; padding: .5rem 1rem .2rem; }
+.drop { animation: drop .4s cubic-bezier(.2,1.4,.4,1) both; transform: rotate(var(--tilt, 0deg)); }
+@media (prefers-reduced-motion: reduce) { .boil::before, .drop, .slam { animation: none !important; } }
+
+/* Layout */
+header.top { position: sticky; top: 0; z-index: 20; background: linear-gradient(#15161fee, #15161fcc); backdrop-filter: blur(6px); border-bottom: 1px solid #ffffff10; }
+header.top .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+header.top nav { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+header.top nav a { font-family: "Lilita One"; text-transform: uppercase; text-decoration: none; color: var(--ghost); white-space: nowrap; font-size: 18px; padding-top: 3px; }
+header.top nav a:hover { color: #fff; }
+section { padding: 72px 0 24px; scroll-margin-top: 64px; }
+.h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+.h2 h2 { margin: 0; font-size: clamp(34px, 6vw, 58px); }
+.lead { max-width: 760px; color: #c9ccd8; font-size: 18px; margin: -10px 0 30px; }
+.grid { display: grid; gap: 22px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.card { padding: 26px; }
+.note { font-size: 14px; color: var(--muted); }
+.paper .note { color: #666a7a; }
+.pill { display: inline-block; font-family: "Lilita One"; text-transform: uppercase; padding: 4px 10px 1px; font-size: 14px; transform: rotate(-1deg); }
+code, pre { font: 500 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { background: #0c0d13; color: #d6d8e3; padding: 16px 18px; overflow-x: auto; margin: 0; border-left: 4px solid var(--accent); }
+.reco { position: absolute; top: -14px; right: 18px; z-index: 2; }
+
+/* Stamp */
+.stamp { display: inline-block; border: .22rem solid currentColor; padding: .35rem .7rem .15rem; font-family: "Lilita One"; text-transform: uppercase; transform: rotate(-6deg); color: var(--red); }
+.slam { animation: slam .5s cubic-bezier(.2,1.4,.4,1) both; }
+
+/* Button: CSS replica of the app's layered SVG button (shadow plate, boiling accent surface, dark plate on hover) */
+.btn { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; min-width: 150px; height: 56px; padding: 2px 28px 6px; border: 0; background: none; cursor: pointer; color: var(--ink); font: 400 20px "Lilita One"; text-transform: uppercase; transition: transform .22s cubic-bezier(.16,1,.3,1), color .16s; }
+.btn::before, .btn::after { content: ""; position: absolute; z-index: -1; pointer-events: none; }
+.btn::before { inset: 0; background: var(--btn, var(--accent)); clip-path: var(--cut); animation: boil .45s steps(4, end) infinite; box-shadow: none; filter: drop-shadow(4px 5px 0 var(--ink)); outline: 3px solid var(--ink); }
+.btn::after { inset: -6px -8px; background: var(--ink); clip-path: polygon(3% 8%, 97% 0%, 100% 92%, 0% 100%); transform: scale(0) rotate(-8deg); transition: transform .22s cubic-bezier(.16,1,.3,1); z-index: -2; }
+.btn span { display: inline-block; transform: rotate(-1.5deg); transition: transform .12s; }
+.btn:hover { color: var(--accent); transform: translateY(-2px); }
+.btn:hover::before { background: var(--ink); }
+.btn:hover::after { transform: scale(1) rotate(0); }
+.btn:hover span { transform: rotate(3deg) scale(1.1); }
+.btn.dark { --btn: var(--panel-2); color: #fff; }
+.btn.sm { height: 44px; min-width: 110px; font-size: 16px; padding: 0 20px 4px; }
+.square { width: 40px; height: 40px; display: inline-grid; place-items: center; border: 0; color: #fff; background: var(--panel-2); clip-path: var(--cut); font-weight: 800; cursor: pointer; }
+.square:hover { background: var(--accent); color: var(--ink); }
+.chip { display: inline-flex; align-items: center; gap: 8px; border: 2px solid var(--ink); background: #fff; color: var(--ink); padding: 5px 12px 4px; font-weight: 700; font-size: 14px; }
+.chip.on { transform: rotate(-2deg); background: var(--accent); box-shadow: 3px 3px 0 var(--ink); }
+.seg { display: inline-flex; border: 2px solid var(--ink); background: #fff; }
+.seg b { font: 400 15px "Lilita One"; text-transform: uppercase; color: var(--ink); padding: 8px 12px 4px; }
+.seg b.on { background: var(--ink); color: var(--accent); }
+
+/* Swatches */
+.swatch { padding: 0; overflow: hidden; }
+.swatch .chipc { height: 110px; display: flex; align-items: flex-end; padding: 12px 14px; font-family: "Lilita One"; font-size: 22px; text-transform: uppercase; }
+.swatch .meta { padding: 12px 14px 14px; background: #fff; color: var(--ink); font-size: 13px; }
+.swatch .meta b { font-size: 15px; }
+
+/* Logo frames */
+.frame { display: grid; place-items: center; min-height: 230px; padding: 28px; position: relative; }
+.frame.dark { background: var(--bg); }
+.frame.blob { background: var(--blobs) 0 0 / 600px 600px, var(--bg); }
+.frame.light { background: #f3f1ec; }
+.frame.accent { background: var(--accent); }
+.frame .lbl { position: absolute; left: 12px; bottom: 10px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+.logo-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 3px solid var(--ink); }
+.logo-row > * + * { border-left: 3px solid var(--ink); }
+.cand { padding: 0; }
+.cand .head { padding: 20px 22px 6px; }
+.cand .head h3 { margin: 0 0 4px; font-size: 30px; }
+.cand .body { padding: 6px 22px 22px; }
+
+/* Icon previews */
+.icons { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-end; }
+.icons figure { margin: 0; display: grid; justify-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.phone { width: 300px; height: 330px; border-radius: 34px; background: radial-gradient(circle at 30% 20%, #3b3f6a, #191a28 70%); padding: 26px 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 10px; align-content: start; border: 6px solid #0b0c12; }
+.phone .app { display: grid; justify-items: center; gap: 5px; font-size: 10.5px; color: #fff; text-shadow: 0 1px 2px #0008; }
+.phone .app i { width: 52px; height: 52px; border-radius: 13px; display: block; background: #ffffff22; }
+
+/* Embeds */
+.og { width: 1200px; height: 630px; position: relative; overflow: hidden; background: var(--blobs) 0 0 / 900px 900px, var(--bg); color: #fff; font-family: Barlow; }
+.og-scale { width: 100%; aspect-ratio: 1200 / 630; position: relative; overflow: hidden; border: 3px solid var(--ink); }
+.og-scale > .og { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.platform { background: #fff; color: #1d1d1f; border-radius: 14px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.discord { background: #313338; color: #dbdee1; border-radius: 6px; padding: 14px 16px; font-family: "gg sans", "Segoe UI", sans-serif; font-size: 14px; }
+.discord .embed { margin-top: 8px; border-left: 4px solid var(--accent); background: #2b2d31; border-radius: 4px; padding: 10px 14px 14px; max-width: 440px; }
+.xcard { border: 1px solid #2f3336; border-radius: 16px; overflow: hidden; background: #000; color: #e7e9ea; font-family: -apple-system, "Segoe UI", sans-serif; }
+.msg { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; background: #fff; padding: 18px; border-radius: 14px; }
+.msg .bubble { max-width: 300px; background: #e9e9eb; color: #000; border-radius: 18px; overflow: hidden; font-family: -apple-system, sans-serif; font-size: 13px; }
+
+/* Do / don't */
+.dd { padding: 22px; }
+.dd h3 { margin: 0 0 10px; font-size: 26px; }
+.dd ul { margin: 0; padding-left: 18px; }
+.dd li { margin: 6px 0; }
+
+/* Numbers */
+.amount { font-family: "Lilita One"; font-size: 34px; }
+footer { padding: 60px 0 80px; color: var(--muted); font-size: 14px; }
+@media (max-width: 640px) {
+  .logo-row > * + * { border-left: 0; border-top: 3px solid var(--ink); }
+  section { padding-top: 56px; }
+  .frame .punch { font-size: 30px !important; }
+  .frame svg { width: 48px; height: 48px; }
+  .frame .stamp { font-size: 30px !important; }
+  .h2 h2 { font-size: 32px; }
+  .card { padding: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SVG library: every mark of the charter, reused below -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- The aim: four dashes, slightly crooked (the app's current mark) -->
+    <symbol id="aim" viewBox="0 0 40 40">
+      <g fill="currentColor">
+        <rect x="18" y="0" width="4" height="10" transform="rotate(-3 20 5)"/>
+        <rect x="18" y="30" width="4" height="10" transform="rotate(4 20 35)"/>
+        <rect x="0" y="18" width="10" height="4" transform="rotate(3 5 20)"/>
+        <rect x="30" y="18" width="10" height="4" transform="rotate(-2 35 20)"/>
+      </g>
+    </symbol>
+    <!-- B · The aimed coin: a hand-cut coin, the aim punched out, a notch -->
+    <symbol id="coin" viewBox="0 0 120 120">
+      <path d="M60 6c27 1 51 21 53 50 2 30-20 57-52 58-31 1-55-23-55-55C6 30 31 5 60 6z" fill="var(--c-fill, #ff7a2f)" stroke="var(--c-line, #11121a)" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M60 20c20 0 38 15 39 37 1 23-16 41-39 41-22 0-39-17-39-39 0-21 17-39 39-39z" fill="none" stroke="var(--c-line, #11121a)" stroke-width="3" stroke-dasharray="7 6" opacity=".45"/>
+      <g fill="var(--c-line, #11121a)">
+        <rect x="56.5" y="28" width="7" height="20" rx="1" transform="rotate(-3 60 38)"/>
+        <rect x="56.5" y="72" width="7" height="20" rx="1" transform="rotate(4 60 82)"/>
+        <rect x="28" y="56.5" width="20" height="7" rx="1" transform="rotate(3 38 60)"/>
+        <rect x="72" y="56.5" width="20" height="7" rx="1" transform="rotate(-2 82 60)"/>
+      </g>
+    </symbol>
+    <!-- D · The slab: the M€ monogram on the accent slab -->
+    <symbol id="slabmark" viewBox="0 0 120 120">
+      <path d="M10 14 112 6 106 108 6 114z" fill="var(--s-fill, #ff7a2f)" stroke="#11121a" stroke-width="6" stroke-linejoin="round"/>
+      <text x="58" y="86" text-anchor="middle" font-family="Lilita One" font-size="64" fill="#11121a" transform="rotate(-6 60 60)">M€</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a href="#top" style="display:flex;align-items:center;gap:10px;text-decoration:none">
+      <svg width="30" height="30" style="color:#fff"><use href="#aim"/></svg>
+      <span class="punch" style="font-size:20px">Monnaie</span>
+    </a>
+    <nav>
+      <a href="#logo">Logo</a><a href="#icone">Icône</a><a href="#couleurs">Couleurs</a><a href="#typo">Typo</a><a href="#formes">Formes</a><a href="#composants">Composants</a><a href="#embeds">Embeds</a><a href="#ton">Ton</a><a href="#regles">Règles</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- 00 · HERO -->
+  <section style="padding-top:64px">
+    <div class="wrap grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));align-items:center;gap:40px">
+      <div>
+        <span class="tag">00 · Charte graphique · proposition</span>
+        <h1 class="punch title drop" style="font-size:clamp(56px,8.5vw,116px);margin:14px 0 6px;--tilt:-1.5deg">Monnaie</h1>
+        <p style="font-size:22px;font-weight:700;max-width:520px;margin:18px 0 0">Ce que je gagne, ce que je crame pour le plaisir, et ce qu'il me reste. <span style="color:var(--accent)">Mois par mois.</span></p>
+        <p class="note" style="max-width:520px">Une app perso de suivi d'argent à la direction « cartoon brutal » : fond de nuit, formes découpées à la main qui frémissent, une seule couleur d'accent, de gros titres. Cette charte fixe le logo, l'icône, les couleurs, la typo, les composants et les images de partage.</p>
+      </div>
+      <div class="shape paper drop card" style="--tilt:1.2deg;padding:34px">
+        <span class="tag" style="color:#666a7a">Bilan d'octobre</span>
+        <p class="punch" style="font-size:clamp(44px,7vw,72px);margin:8px 0 0">+241,44 €</p>
+        <p style="font-weight:600;color:#444;margin:6px 0 14px">gardé sur ce que tu as gagné.</p>
+        <span class="pill" style="background:var(--yellow);box-shadow:3px 3px 0 var(--ink)">+225,00 € sur l'épargne</span>
+        <span class="pill" style="background:var(--ink);color:#fff;margin-left:6px;transform:rotate(1deg)">+16,44 € sur le compte</span>
+        <span class="stamp slam" style="position:absolute;right:22px;top:24px;font-size:20px;color:var(--green)">Gardé</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 · LOGO -->
+  <section id="logo">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">01 · Le logo</h2><span class="tag">4 pistes · 1 recommandée</span></div>
+      <p class="lead">Quatre pistes, toutes nées de ce que l'app montre déjà (le viseur, les plaques découpées, le tampon). La piste B est recommandée : elle garde le viseur de l'app et le pose sur une pièce, ce qui dit « argent » sans un mot.</p>
+
+      <div class="grid g2">
+        <!-- A -->
+        <div class="shape panel cand">
+          <div class="head"><span class="tag">Piste A</span><h3 class="punch">Le viseur</h3><p class="note">Le signe actuel de l'app : quatre traits de travers, un viseur sur ton argent. Minimal, très lisible en petit, mais il ne dit pas « argent » tout seul.</p></div>
+          <div class="logo-row">
+            <div class="frame blob"><div style="display:flex;align-items:center;gap:16px"><svg width="64" height="64" style="color:#fff"><use href="#aim"/></svg><span class="punch title" style="font-size:52px">Monnaie</span></div><span class="lbl">Sur nuit</span></div>
+          </div>
+          <div class="logo-row">
+            <div class="frame light" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink)"><svg width="44" height="44"><use href="#aim"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur clair</span></div>
+            <div class="frame accent" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink)"><svg width="44" height="44"><use href="#aim"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur accent</span></div>
+          </div>
+        </div>
+
+        <!-- B (recommended) -->
+        <div class="shape cand" style="--shape:var(--panel-2)">
+          <span class="shape slab punch boil reco" style="font-size:18px;transform:rotate(3deg)">Recommandée</span>
+          <div class="head"><span class="tag">Piste B</span><h3 class="punch">La pièce visée</h3><p class="note">Une pièce découpée à la main, cerclée d'encre, avec le viseur de l'app gravé au centre. C'est le signe (icône, favicon, avatar) ; le mot-symbole reste en Lilita One, légèrement incliné.</p></div>
+          <div class="logo-row">
+            <div class="frame blob"><div style="display:flex;align-items:center;gap:16px"><svg width="86" height="86" style="transform:rotate(-8deg)"><use href="#coin"/></svg><span class="punch title" style="font-size:54px;display:inline-block;transform:rotate(-2deg)">Monnaie</span></div><span class="lbl">Logo principal</span></div>
+          </div>
+          <div class="logo-row">
+            <div class="frame light" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink)"><svg width="58" height="58" style="transform:rotate(-8deg)"><use href="#coin"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur clair</span></div>
+            <div class="frame accent" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink);--c-fill:#fff"><svg width="58" height="58" style="transform:rotate(-8deg)"><use href="#coin"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur accent (pièce blanche)</span></div>
+          </div>
+        </div>
+
+        <!-- C -->
+        <div class="shape panel cand">
+          <div class="head"><span class="tag">Piste C</span><h3 class="punch">Le tampon</h3><p class="note">Le tampon « Dans le rouge » de l'app, devenu logo : le nom dans un cadre d'encre, tamponné de travers. Très expressif, idéal en sticker ou en bandeau, moins en icône.</p></div>
+          <div class="logo-row">
+            <div class="frame blob"><span class="stamp" style="font-size:54px;color:var(--accent);border-width:6px;padding:10px 20px 2px">Monnaie</span><span class="lbl">Sur nuit</span></div>
+          </div>
+          <div class="logo-row">
+            <div class="frame light" style="min-height:150px"><span class="stamp" style="font-size:34px;color:var(--red)">Monnaie</span><span class="lbl" style="color:var(--ink)">Variante rouge</span></div>
+            <div class="frame accent" style="min-height:150px"><span class="stamp" style="font-size:34px;color:var(--ink)">Monnaie</span><span class="lbl" style="color:var(--ink)">Sur accent</span></div>
+          </div>
+        </div>
+
+        <!-- D -->
+        <div class="shape panel cand">
+          <div class="head"><span class="tag">Piste D</span><h3 class="punch">La plaque M€</h3><p class="note">Un monogramme « M€ » sur la plaque orange qui frémit, comme les titres actifs du menu. Fort en icône ; plus générique en version longue.</p></div>
+          <div class="logo-row">
+            <div class="frame blob"><div style="display:flex;align-items:center;gap:16px"><svg width="86" height="86"><use href="#slabmark"/></svg><span class="punch title" style="font-size:52px">Monnaie</span></div><span class="lbl">Sur nuit</span></div>
+          </div>
+          <div class="logo-row">
+            <div class="frame light" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink)"><svg width="58" height="58"><use href="#slabmark"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur clair</span></div>
+            <div class="frame accent" style="min-height:150px"><div style="display:flex;align-items:center;gap:12px;color:var(--ink);--s-fill:#fff"><svg width="58" height="58"><use href="#slabmark"/></svg><span class="punch" style="font-size:36px">Monnaie</span></div><span class="lbl" style="color:var(--ink)">Sur accent</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid g3" style="margin-top:26px">
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">Construction · piste B</span>
+          <div style="display:grid;place-items:center;padding:18px 0;position:relative">
+            <svg width="170" height="170" style="transform:rotate(-8deg);outline:1px dashed #c9c9d3;outline-offset:22px"><use href="#coin"/></svg>
+          </div>
+          <ul class="note" style="padding-left:18px;margin:0">
+            <li>Pièce : cercle découpé à la main, contour d'encre de 5 % du diamètre.</li>
+            <li>Viseur : 4 traits de 17 % du diamètre, de travers de 2 à 4°.</li>
+            <li>Toujours penché de −8°. Zone de protection : un trait de viseur tout autour.</li>
+          </ul>
+        </div>
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">Tailles minimales</span>
+          <div style="display:flex;align-items:flex-end;gap:22px;padding:22px 0">
+            <svg width="16" height="16"><use href="#coin"/></svg>
+            <svg width="24" height="24"><use href="#coin"/></svg>
+            <svg width="32" height="32"><use href="#coin"/></svg>
+            <svg width="48" height="48"><use href="#coin"/></svg>
+            <div style="display:flex;align-items:center;gap:6px"><svg width="22" height="22"><use href="#coin"/></svg><span class="punch" style="font-size:18px">Monnaie</span></div>
+          </div>
+          <p class="note">Le signe seul tient dès 16 px (le cercle pointillé disparaît en dessous de 32 px). Le logo complet : 18 px de hauteur de lettre minimum.</p>
+        </div>
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">À ne pas faire</span>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 0">
+            <div style="display:grid;place-items:center;position:relative"><svg width="54" height="54" style="--c-fill:#4b7bff"><use href="#coin"/></svg><b style="position:absolute;color:var(--red);font-size:34px">✕</b></div>
+            <div style="display:grid;place-items:center;position:relative"><svg width="70" height="40" preserveAspectRatio="none"><use href="#coin"/></svg><b style="position:absolute;color:var(--red);font-size:34px">✕</b></div>
+            <div style="display:grid;place-items:center;position:relative;filter:drop-shadow(0 6px 8px #0009) blur(.3px)"><svg width="54" height="54"><use href="#coin"/></svg><b style="position:absolute;color:var(--red);font-size:34px">✕</b></div>
+          </div>
+          <p class="note">Pas d'autre couleur que l'accent ou le blanc, pas de déformation, pas d'ombre floue ni de dégradé : les ombres de la marque sont toujours pleines et décalées.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · ICON -->
+  <section id="icone">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">02 · Icône &amp; favicon</h2><span class="tag">PWA · iOS · onglet</span></div>
+      <p class="lead">L'icône pose la pièce sur le fond de nuit, avec la plaque d'accent derrière pour qu'elle reste repérable parmi les autres apps. La version « maskable » garde tout dans le cercle central de 80 %.</p>
+      <div class="grid g2">
+        <div class="shape panel card">
+          <div class="icons">
+            <figure>
+              <svg width="180" height="180" viewBox="0 0 180 180">
+                <rect width="180" height="180" rx="40" fill="#15161f"/>
+                <path d="M30 44 150 30 142 146 26 152z" fill="#ff7a2f" stroke="#11121a" stroke-width="5"/>
+                <svg x="34" y="34" width="112" height="112" style="--c-fill:#fff"><use href="#coin" transform="rotate(-8 56 56)"/></svg>
+              </svg>
+              Icône · 512 / 192 / 180
+            </figure>
+            <figure>
+              <svg width="120" height="120" viewBox="0 0 180 180">
+                <rect width="180" height="180" fill="#15161f"/>
+                <circle cx="90" cy="90" r="72" fill="none" stroke="#ffffff33" stroke-dasharray="4 5"/>
+                <path d="M44 56 138 46 132 134 40 140z" fill="#ff7a2f" stroke="#11121a" stroke-width="5"/>
+                <svg x="48" y="48" width="84" height="84" style="--c-fill:#fff"><use href="#coin"/></svg>
+              </svg>
+              Maskable (zone sûre)
+            </figure>
+            <figure>
+              <div style="display:flex;gap:14px;align-items:flex-end">
+                <svg width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#15161f"/><svg x="3" y="3" width="26" height="26"><use href="#coin"/></svg></svg>
+                <svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#15161f"/><svg x="2" y="2" width="28" height="28"><use href="#coin"/></svg></svg>
+              </div>
+              Favicon · 32 / 16
+            </figure>
+          </div>
+          <div style="margin-top:22px;background:#2b2d3d;border-radius:10px 10px 0 0;padding:8px 10px 0;display:flex;gap:6px">
+            <div style="background:var(--bg);border-radius:8px 8px 0 0;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:13px">
+              <svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#15161f"/><svg x="2" y="2" width="28" height="28"><use href="#coin"/></svg></svg>Monnaie · Octobre 2026 <span style="opacity:.5;margin-left:8px">✕</span>
+            </div>
+            <div style="padding:8px 14px;font-size:13px;opacity:.6">atools</div>
+          </div>
+        </div>
+        <div class="shape panel card" style="display:grid;place-items:center">
+          <div class="phone">
+            <div class="app"><i></i>Photos</div><div class="app"><i></i>Plans</div><div class="app"><i></i>Musique</div><div class="app"><i></i>Notes</div>
+            <div class="app"><i></i>Météo</div>
+            <div class="app">
+              <svg width="52" height="52" viewBox="0 0 180 180"><rect width="180" height="180" rx="40" fill="#15161f"/><path d="M30 44 150 30 142 146 26 152z" fill="#ff7a2f" stroke="#11121a" stroke-width="5"/><svg x="34" y="34" width="112" height="112" style="--c-fill:#fff"><use href="#coin" transform="rotate(-8 56 56)"/></svg></svg>
+              Monnaie
+            </div>
+            <div class="app"><i></i>Banque</div><div class="app"><i></i>Strava</div>
+          </div>
+          <p class="note" style="margin-top:14px">Sur l'écran d'accueil : le fond de nuit et la plaque orange font ressortir l'icône sans dégradé.</p>
+        </div>
+      </div>
+      <div style="margin-top:22px"><pre>&lt;!-- manifest.webmanifest --&gt;
+"background_color": "#15161f", "theme_color": "#15161f",
+"icons": [ icon-192.png (any), icon-512.png (any), icon-maskable-512.png (maskable) ]
+&lt;link rel="apple-touch-icon" href="/assets/monnaie/apple-touch-icon.png"&gt;  &lt;!-- 180 × 180, sans transparence --&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- 03 · COLORS -->
+  <section id="couleurs">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">03 · Couleurs</h2><span class="tag">1 accent · des sens fixes</span></div>
+      <p class="lead">Une seule couleur d'accent, l'orange fluo. Les autres couleurs ont un sens fixe : chacune désigne un type de ligne, partout dans l'app (pastilles, montants, graphiques).</p>
+      <div class="grid g4">
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--accent);color:var(--ink)">Accent</div><div class="meta"><b>#FF7A2F</b> · plaisir, actions, sélection. Texte posé dessus : encre.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--bg)">Nuit</div><div class="meta"><b>#15161F</b> · fond de page, avec ses taches de camouflage #0F1017.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--panel)">Panneau</div><div class="meta"><b>#262838</b> · panneaux ; <b>#33364A</b> pour les tickets dedans.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--ink)">Encre</div><div class="meta"><b>#11121A</b> · contours, ombres pleines, texte sur papier et accent.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:#fff;color:var(--ink);outline:2px solid #eee;outline-offset:-2px">Papier</div><div class="meta"><b>#FFFFFF</b> · cartes « papier », revenus.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--muted)">Gris</div><div class="meta"><b>#8F93A5</b> · charges, textes secondaires.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--yellow);color:var(--ink)">Épargne</div><div class="meta"><b>#FEC83E</b> · livrets, ce qui est mis de côté.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--red)">Alerte</div><div class="meta"><b>#F6556D</b> · dettes, dans le rouge, regrets.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--blue);color:var(--ink)">Virement</div><div class="meta"><b>#7CC4FF</b> · virements entre tes comptes, rattachements.</div></div>
+        <div class="shape paper swatch"><div class="chipc" style="background:var(--green);color:var(--ink)">Gardé</div><div class="meta"><b>#5EE08A</b> · courbe du gardé, « ✓ tout colle ».</div></div>
+      </div>
+      <div class="shape panel card" style="margin-top:22px">
+        <span class="tag">Répartition conseillée d'un écran</span>
+        <div style="display:flex;height:34px;margin-top:12px;border:3px solid var(--ink)">
+          <div style="flex:60;background:var(--bg)"></div><div style="flex:22;background:var(--panel)"></div><div style="flex:10;background:#fff"></div><div style="flex:6;background:var(--accent)"></div><div style="flex:2;background:var(--yellow)"></div>
+        </div>
+        <p class="note">60 % nuit · 22 % panneaux · 10 % papier · 6 % accent · le reste pour les couleurs de sens. Si l'orange dépasse 10 % de l'écran, il ne guide plus l'œil.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · TYPE -->
+  <section id="typo">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">04 · Typographie</h2><span class="tag">Lilita One · Barlow</span></div>
+      <div class="grid g2">
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">Titres, montants, boutons</span>
+          <p class="punch" style="font-size:96px;margin:10px 0">Aa</p>
+          <p class="punch" style="font-size:28px;margin:0">Lilita One · capitales</p>
+          <p class="note">Toujours en majuscules, interlignage 0,95. Les grands titres reçoivent un épais contour #33364A peint sous la lettre et une ombre pleine décalée.</p>
+        </div>
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">Texte, étiquettes, données</span>
+          <p style="font:800 96px/1 Barlow;margin:10px 0">Aa</p>
+          <p style="font:700 22px Barlow;margin:0">Barlow · 500, 600, 700, 800</p>
+          <p class="note">Corps à 500, étiquettes en 700 majuscules espacées (0,05 em), libellés de lignes en 700. Les montants gardent toujours leurs centimes.</p>
+        </div>
+      </div>
+      <div class="shape panel card" style="margin-top:22px;display:grid;gap:14px">
+        <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span class="tag" style="width:110px">Écran · 96</span><span class="punch title" style="font-size:72px">Octobre 2026</span></div>
+        <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span class="tag" style="width:110px">Montant · 64</span><span class="punch" style="font-size:56px">+241,44 €</span></div>
+        <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span class="tag" style="width:110px">Panneau · 30</span><span class="punch" style="font-size:30px">Les catégories</span></div>
+        <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span class="tag" style="width:110px">Ligne · 18</span><span style="font-weight:700;font-size:18px">BURGER KING</span><span class="note">Restau &amp; fast-food · Revolut</span></div>
+        <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span class="tag" style="width:110px">Étiquette · 13</span><span class="tag">Bilan d'octobre</span><span style="font:700 12px Barlow;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Par mois actif</span></div>
+      </div>
+      <div class="shape panel card" style="margin-top:22px">
+        <span class="tag">Les montants, partout pareils</span>
+        <div style="display:flex;flex-wrap:wrap;gap:28px;margin-top:10px;align-items:baseline">
+          <span class="amount" style="color:#fff">+1 790,89 €</span><span class="amount" style="color:var(--accent)">−266,74 €</span><span class="amount" style="color:var(--muted)">−1 243,55 €</span><span class="amount" style="color:var(--yellow)">+225,00 €</span><span class="amount" style="color:var(--red)">−10,00 €</span><span class="amount" style="color:var(--blue)">14,75 €</span>
+        </div>
+        <p class="note">Revenu · plaisir · charge · épargne · dette · virement interne (sans signe : il ne fait ni gagner ni perdre). Signe moins typographique « − », espace fine avant €, jamais d'arrondi.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · SHAPES -->
+  <section id="formes">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">05 · Formes &amp; mouvement</h2><span class="tag">découpé · frémit · tombe</span></div>
+      <div class="grid g3">
+        <div class="shape panel card"><span class="tag">Découpe à la main</span><div class="shape paper" style="height:110px;margin:18px 6px;display:grid;place-items:center"><b>Papier découpé</b></div><p class="note">Aucun rectangle parfait : 4 coins légèrement décalés (clip-path). Ombre pleine décalée de 0,45 × 0,6 rem, jamais floue.</p></div>
+        <div class="shape panel card"><span class="tag">Line boil</span><div style="height:110px;margin:18px 6px;display:grid;place-items:center"><span class="shape slab punch boil" style="font-size:34px">Ce mois</span></div><p class="note">Les accents frémissent en 4 images par 0,45 s, comme un dessin animé fait main. Seulement les accents (boutons, plaques), jamais le texte ni les panneaux.</p></div>
+        <div class="shape panel card"><span class="tag">Tampon</span><div style="height:110px;margin:18px 6px;display:grid;place-items:center"><span class="stamp slam" style="font-size:30px">Dans le rouge</span></div><p class="note">Tombe en rebondissant (slam), cadre d'encre de 0,22 rem, penché de −6°. Pour les verdicts : « Dans le rouge », « Importé », « Gardé ».</p></div>
+      </div>
+      <div class="shape panel card" style="margin-top:22px">
+        <span class="tag">Mouvement</span>
+        <div class="grid g3" style="margin-top:12px">
+          <p class="note"><b style="color:#fff">Arrivée</b> · les cartes tombent (drop) : 0,4 s, ressort cubic-bezier(.2, 1.4, .4, 1), avec leur inclinaison.</p>
+          <p class="note"><b style="color:#fff">Chiffres</b> · les montants défilent jusqu'à leur valeur (0,7 s) sans changer la largeur de la ligne.</p>
+          <p class="note"><b style="color:#fff">Calme</b> · tout s'arrête si l'appareil demande moins d'animations (prefers-reduced-motion).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 · COMPONENTS -->
+  <section id="composants">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">06 · Composants</h2><span class="tag">survole-les</span></div>
+      <div class="grid g2">
+        <div class="shape panel card" style="display:grid;gap:22px">
+          <span class="tag">Boutons</span>
+          <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center">
+            <button class="btn"><span>+ Ajouter</span></button>
+            <button class="btn dark"><span>Aujourd'hui</span></button>
+            <button class="btn sm"><span>Importer ▸</span></button>
+            <button class="square">◀</button><button class="square">▶</button><button class="square">✕</button>
+          </div>
+          <p class="note">Plaque d'accent qui frémit sur une ombre d'encre ; au survol, une plaque d'encre se déplie derrière et le texte passe à l'accent en se penchant. Un écran a un seul bouton accent.</p>
+        </div>
+        <div class="shape panel card" style="display:grid;gap:18px">
+          <span class="tag">Choix &amp; filtres</span>
+          <div style="display:flex;flex-wrap:wrap;gap:10px"><span class="chip on">🍔 Restau</span><span class="chip">🍻 Sorties</span><span class="chip">🛍️ Shopping</span></div>
+          <div class="seg" style="justify-self:start"><b class="on">Date</b><b>Montant</b><b>Nom</b></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap"><span class="pill" style="background:var(--accent);color:var(--ink)">39 nouvelles</span><span class="pill" style="background:var(--blue);color:var(--ink)">1 rattachée</span><span class="pill" style="background:#ffffff1a">172 déjà là</span></div>
+        </div>
+        <div class="shape panel card">
+          <span class="tag">Ticket de ligne</span>
+          <div class="shape" style="--shape:var(--panel-2);display:flex;align-items:center;gap:14px;padding:12px 16px;margin-top:14px;transform:rotate(-.35deg);filter:drop-shadow(.3rem .35rem 0 #0007)">
+            <span style="width:46px;height:46px;display:grid;place-items:center;background:var(--accent);font-size:22px;transform:rotate(-6deg);box-shadow:3px 3px 0 var(--ink)">🍔</span>
+            <span style="flex:1;min-width:0"><b style="display:block;font-size:17px">BURGER KING</b><span class="note">Restau &amp; fast-food · Revolut</span></span>
+            <span class="amount" style="font-size:28px;color:var(--accent)">−16,40 €</span>
+          </div>
+          <div class="shape" style="--shape:var(--panel-2);display:flex;align-items:center;gap:14px;padding:12px 16px;margin-top:12px;transform:rotate(.35deg);filter:drop-shadow(.3rem .35rem 0 #0007)">
+            <span style="width:46px;height:46px;display:grid;place-items:center;background:var(--blue);font-size:22px;transform:rotate(-6deg);box-shadow:3px 3px 0 var(--ink)">🔁</span>
+            <span style="flex:1;min-width:0"><b style="display:block;font-size:17px">REVOLUT</b><span class="note">Revolut → Compte courant</span></span>
+            <span class="amount" style="font-size:28px;color:var(--blue)">14,75 €</span>
+          </div>
+        </div>
+        <div class="shape paper card">
+          <span class="tag" style="color:#666a7a">Carte de survol</span>
+          <div style="margin-top:14px;border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:12px;max-width:320px">
+            <div style="display:flex;justify-content:space-between;border-bottom:2px dashed #ddd;padding-bottom:6px"><b class="punch" style="font-size:17px">Burger King · 17 passages</b><b class="punch" style="font-size:17px;color:var(--accent)">243,35 €</b></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:13px;margin-top:8px">
+              <span><b style="color:#888">12 févr.</b> 16,40 €</span><span><b style="color:#888">29 mars</b> 16,60 €</span><span><b style="color:#888">6 avr.</b> 10,00 €</span><span style="background:var(--accent)"><b>9 avr.</b> 7,00 €</span>
+            </div>
+          </div>
+          <p class="note">Bordure d'encre, ombre pleine, pointillés de séparation. Une ligne qui s'éclaire en orange se clique.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 · EMBEDS -->
+  <section id="embeds">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">07 · Embeds de partage</h2><span class="tag">Open Graph · 1200 × 630</span></div>
+      <p class="lead">Ce qu'on voit quand un lien Monnaie est collé dans iMessage, Discord ou X. Trois gabarits : l'app, le bilan d'un mois, le bilan d'une année. Même fond de nuit, une carte papier, un seul gros chiffre.</p>
+
+      <div class="grid g2">
+        <div>
+          <span class="tag">Gabarit 1 · l'app</span>
+          <div class="og-scale" data-og style="margin-top:10px">
+            <div class="og">
+              <div style="position:absolute;left:90px;top:110px">
+                <div style="display:flex;align-items:center;gap:30px"><svg width="170" height="170" style="transform:rotate(-8deg)"><use href="#coin"/></svg><span class="punch title" style="font-size:150px;display:inline-block;transform:rotate(-2deg)">Monnaie</span></div>
+                <p style="font:700 44px/1.25 Barlow;max-width:900px;margin:50px 0 0">Ce que je gagne, ce que je crame pour le plaisir, et ce qu'il me reste. <span style="color:var(--accent)">Mois par mois.</span></p>
+              </div>
+              <span class="shape slab punch" style="position:absolute;right:70px;top:60px;font-size:34px;transform:rotate(4deg)">atools</span>
+              <span class="tag" style="position:absolute;left:90px;bottom:50px;font-size:26px">atools.akinaru.fr/apps/monnaie</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="tag">Gabarit 2 · bilan du mois</span>
+          <div class="og-scale" data-og style="margin-top:10px">
+            <div class="og">
+              <div style="position:absolute;left:80px;top:60px;display:flex;align-items:center;gap:18px"><svg width="70" height="70"><use href="#coin"/></svg><span class="punch" style="font-size:44px">Monnaie</span></div>
+              <span class="punch title" style="position:absolute;left:80px;top:160px;font-size:120px;display:inline-block;transform:rotate(-1.5deg)">Octobre <span style="color:var(--accent)">2026</span></span>
+              <div class="shape paper" style="position:absolute;left:80px;top:330px;width:640px;height:230px;padding:30px 40px;transform:rotate(-1deg)">
+                <span class="tag" style="font-size:22px;color:#666a7a">Gardé ce mois</span>
+                <p class="punch" style="font-size:110px;margin:8px 0 0">+241,44 €</p>
+              </div>
+              <div style="position:absolute;right:80px;top:330px;display:grid;gap:18px;width:360px">
+                <div class="shape" style="--shape:var(--panel);padding:16px 22px"><span class="tag" style="font-size:18px">Encaissé</span><p class="punch" style="font-size:44px;margin:4px 0 0">1 995,27 €</p></div>
+                <div class="shape" style="--shape:var(--panel);padding:16px 22px"><span class="tag" style="font-size:18px">Plaisir</span><p class="punch" style="font-size:44px;margin:4px 0 0;color:var(--accent)">−517,31 €</p></div>
+              </div>
+              <span class="stamp" style="position:absolute;right:90px;top:80px;font-size:40px;color:var(--green)">Gardé</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="tag">Gabarit 3 · bilan de l'année</span>
+          <div class="og-scale" data-og style="margin-top:10px">
+            <div class="og">
+              <div style="position:absolute;left:80px;top:60px;display:flex;align-items:center;gap:18px"><svg width="70" height="70"><use href="#coin"/></svg><span class="punch" style="font-size:44px">Monnaie</span></div>
+              <span class="punch title" style="position:absolute;left:80px;top:150px;font-size:180px">2025</span>
+              <svg viewBox="0 0 600 220" style="position:absolute;right:70px;top:110px;width:600px;height:220px">
+                <polyline points="0,150 55,120 110,40 165,60 220,90 275,170 330,200 385,205 440,120 495,140 550,90" fill="none" stroke="#ff7a2f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+                <polyline points="0,190 55,185 110,180 165,190 220,188 275,180 330,186 385,190 440,170 495,175 550,120" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="2 14" stroke-linecap="round"/>
+              </svg>
+              <div style="position:absolute;left:80px;bottom:70px;right:80px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+                <div class="shape paper" style="padding:22px 28px;transform:rotate(-1deg)"><span class="tag" style="font-size:18px;color:#666a7a">Gardé</span><p class="punch" style="font-size:50px;margin:4px 0 0;white-space:nowrap">+3 120,40 €</p></div>
+                <div class="shape" style="--shape:var(--yellow);color:var(--ink);padding:22px 28px;transform:rotate(1deg)"><span class="tag" style="font-size:18px;color:#5b4a10">Livrets</span><p class="punch" style="font-size:50px;margin:4px 0 0;white-space:nowrap">1 780,31 €</p></div>
+                <div class="shape" style="--shape:var(--panel);padding:22px 28px"><span class="tag" style="font-size:18px">Plaisir / mois</span><p class="punch" style="font-size:50px;margin:4px 0 0;color:var(--accent);white-space:nowrap">638,66 €</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="shape panel card" style="grid-column:1/-1">
+          <span class="tag">Règles des embeds</span>
+          <ul class="note" style="padding-left:18px">
+            <li>1200 × 630, zone utile à 80 px des bords (Discord et X recadrent).</li>
+            <li>Un seul gros chiffre, lisible en vignette de 300 px : 100 px de hauteur de lettre minimum.</li>
+            <li>Logo en haut à gauche, jamais en filigrane. Fond de nuit à taches, une carte papier.</li>
+            <li>Les montants réels n'apparaissent que si tu le choisis : l'image par défaut (gabarit 1) ne montre aucun chiffre perso.</li>
+          </ul>
+          <pre style="margin-top:12px">&lt;meta property="og:title" content="Monnaie · Octobre 2026"&gt;
+&lt;meta property="og:description" content="Ce que je gagne, ce que je crame, ce qu'il me reste."&gt;
+&lt;meta property="og:image" content="https://atools.akinaru.fr/assets/monnaie/og.png"&gt;
+&lt;meta property="og:image:width" content="1200"&gt;
+&lt;meta property="og:image:height" content="630"&gt;
+&lt;meta name="twitter:card" content="summary_large_image"&gt;
+&lt;meta name="theme-color" content="#15161f"&gt;</pre>
+        </div>
+      </div>
+
+      <div class="grid g3" style="margin-top:30px;align-items:start">
+        <div>
+          <span class="tag">Dans iMessage</span>
+          <div class="msg" style="margin-top:10px">
+            <div class="bubble">
+              <div class="og-scale" data-og style="border:0"><div class="og">
+                <div style="position:absolute;left:90px;top:120px;display:flex;align-items:center;gap:30px"><svg width="170" height="170" style="transform:rotate(-8deg)"><use href="#coin"/></svg><span class="punch title" style="font-size:150px">Monnaie</span></div>
+                <p style="position:absolute;left:90px;top:360px;font:700 46px/1.25 Barlow;max-width:950px;margin:0">Ce que je gagne, ce que je crame, <span style="color:var(--accent)">ce qu'il me reste.</span></p>
+              </div></div>
+              <div style="padding:8px 12px 10px"><b>Monnaie</b><div style="color:#6e6e73">atools.akinaru.fr</div></div>
+            </div>
+            <span style="font:11px -apple-system;color:#8e8e93">Distribué</span>
+          </div>
+        </div>
+        <div>
+          <span class="tag">Dans Discord</span>
+          <div class="discord" style="margin-top:10px">
+            <b style="color:#fff">maxime</b> <span style="font-size:12px;color:#949ba4">Aujourd'hui à 21:42</span>
+            <div style="color:#00a8fc">https://atools.akinaru.fr/apps/monnaie</div>
+            <div class="embed">
+              <div style="font-size:12px;color:#b5bac1">atools</div>
+              <div style="color:#00a8fc;font-weight:700;margin:2px 0">Monnaie · Octobre 2026</div>
+              <div style="font-size:13px">Ce que je gagne, ce que je crame, ce qu'il me reste.</div>
+              <div class="og-scale" data-og style="margin-top:10px;border:0;border-radius:4px"><div class="og">
+                <span class="punch title" style="position:absolute;left:80px;top:80px;font-size:120px">Octobre <span style="color:var(--accent)">2026</span></span>
+                <div class="shape paper" style="position:absolute;left:80px;top:270px;width:760px;height:260px;padding:34px 44px;transform:rotate(-1deg)"><span class="tag" style="font-size:24px;color:#666a7a">Gardé ce mois</span><p class="punch" style="font-size:130px;margin:6px 0 0">+241,44 €</p></div>
+                <svg width="160" height="160" style="position:absolute;right:90px;top:90px;transform:rotate(-8deg)"><use href="#coin"/></svg>
+              </div></div>
+            </div>
+          </div>
+          <p class="note">La barre de gauche prend la couleur du theme-color : passe-la à l'accent (#FF7A2F) pour Discord.</p>
+        </div>
+        <div>
+          <span class="tag">Sur X</span>
+          <div class="xcard" style="margin-top:10px">
+            <div class="og-scale" data-og style="border:0"><div class="og">
+              <span class="punch title" style="position:absolute;left:80px;top:140px;font-size:200px">2025</span>
+              <div class="shape paper" style="position:absolute;left:80px;bottom:80px;width:600px;padding:26px 34px;transform:rotate(-1deg)"><span class="tag" style="font-size:22px;color:#666a7a">Gardé sur l'année</span><p class="punch" style="font-size:80px;margin:6px 0 0">+3 120,40 €</p></div>
+              <svg width="200" height="200" style="position:absolute;right:110px;top:130px;transform:rotate(-8deg)"><use href="#coin"/></svg>
+            </div></div>
+            <div style="padding:10px 14px;font-size:14px"><span style="color:#71767b">atools.akinaru.fr</span><div>Monnaie · 2025</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 · TONE -->
+  <section id="ton">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">08 · Le ton</h2><span class="tag">tutoiement · franc · un peu moqueur</span></div>
+      <p class="lead">Monnaie parle comme un pote qui regarde tes comptes avec toi : il tutoie, il dit les choses franchement, il charrie un peu, il ne fait jamais la morale. Phrases courtes, verbes du quotidien (« cramer », « garder », « mettre de côté »).</p>
+      <div class="grid g3">
+        <div class="shape paper card"><span class="tag" style="color:#666a7a">Oui</span><p class="punch" style="font-size:28px;margin:10px 0">« J'ai cramé… »</p><p class="punch" style="font-size:28px;margin:10px 0">« Pas de budget fixé. Freestyle total. »</p><p class="punch" style="font-size:28px;margin:10px 0">« ✓ Tout colle au centime »</p></div>
+        <div class="shape paper card"><span class="tag" style="color:#666a7a">Non</span><p style="font-size:20px;font-weight:700;margin:10px 0;color:#888;text-decoration:line-through">« Veuillez saisir une dépense. »</p><p style="font-size:20px;font-weight:700;margin:10px 0;color:#888;text-decoration:line-through">« Attention ! Vos dépenses sont excessives. »</p><p style="font-size:20px;font-weight:700;margin:10px 0;color:#888;text-decoration:line-through">« Transaction synchronisée avec succès. »</p></div>
+        <div class="shape panel card"><span class="tag">Les mots de l'app</span>
+          <ul class="note" style="padding-left:18px">
+            <li><b style="color:#fff">Gardé</b> : ce qui reste de ce que tu as gagné, où que ce soit.</li>
+            <li><b style="color:#fff">Plaisir</b> : les dépenses pas nécessaires (le budget).</li>
+            <li><b style="color:#fff">Charges</b> : le nécessaire (loyer, courses, assurances).</li>
+            <li><b style="color:#fff">L'ardoise</b> : qui doit quoi à qui.</li>
+            <li><b style="color:#fff">Pointage</b> : le vrai solde lu dans l'appli bancaire.</li>
+            <li><b style="color:#fff">Virement interne</b> : de toi à toi, ni gagné ni perdu.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 · RULES -->
+  <section id="regles">
+    <div class="wrap">
+      <div class="h2"><h2 class="punch title">09 · Règles</h2><span class="tag">à faire · à éviter</span></div>
+      <div class="grid g2">
+        <div class="shape card dd" style="--shape:color-mix(in srgb, var(--green) 22%, var(--panel))">
+          <h3 class="punch">✓ À faire</h3>
+          <ul>
+            <li>Un seul accent orange par écran, sur l'action principale ou le chiffre clé.</li>
+            <li>Des formes découpées et légèrement penchées (−2° à +2°), des ombres pleines d'encre.</li>
+            <li>Des couleurs de sens constantes : jaune = épargne, bleu = virement, rouge = dette.</li>
+            <li>Tous les montants avec leurs centimes, le « − » typographique, l'euro après.</li>
+            <li>Le frémissement seulement sur les accents ; tout s'arrête en mouvement réduit.</li>
+          </ul>
+        </div>
+        <div class="shape card dd" style="--shape:color-mix(in srgb, var(--red) 22%, var(--panel))">
+          <h3 class="punch">✕ À éviter</h3>
+          <ul>
+            <li>Les dégradés, les ombres floues, les coins arrondis réguliers.</li>
+            <li>Le noir sur noir : un panneau est toujours plus clair que le fond.</li>
+            <li>Le texte qui frémit, ou les panneaux entiers qui frémissent (illisible, fatigant).</li>
+            <li>Arrondir un montant, ou mélanger des couleurs de sens (une dépense en jaune).</li>
+            <li>Plus de deux polices, ou du Lilita One en minuscules.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Monnaie · charte graphique, proposition v1 · tokens repris de <code>src/apps/monnaie/ui/monnaie.css</code></div></footer>
+
+<script>
+  // Scales every 1200 × 630 embed to the width of its frame.
+  const fit = () => document.querySelectorAll("[data-og]").forEach((frame) => {
+    const og = frame.querySelector(".og");
+    if (og) og.style.transform = `scale(${frame.clientWidth / 1200})`;
+  });
+  addEventListener("resize", fit);
+  document.fonts?.ready.then(fit);
+  fit();
+</script>
+</body>
+</html>
