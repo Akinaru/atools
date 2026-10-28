@@ -6,8 +6,8 @@ import { isTyping, playSound } from "./sound";
 
 /**
  * Status bar of the shell. On the home and login screens it sits on top of the page. Inside an app the app is
- * full screen: the bar is hidden and slides over the app from the top when the tab (bottom right edge, barely
- * visible until hovered) or the M key opens it.
+ * full screen: the bar is hidden; the tab (bottom right edge, barely visible until hovered) or the M key brings it
+ * back and pushes the app inside the console's white frame again (html[data-shell-open], styled in globals.css).
  */
 export function ShellMenu({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +18,11 @@ export function ShellMenu({ children }: { children: ReactNode }) {
     playSound(open ? "back" : "select");
     setOpen(!open);
   };
+
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-shell-open", inApp && open);
+    return () => document.documentElement.removeAttribute("data-shell-open");
+  }, [inApp, open]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -34,7 +39,7 @@ export function ShellMenu({ children }: { children: ReactNode }) {
     <>
       <div
         inert={!open}
-        className={`fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-black/35 to-transparent pb-8 transition duration-300 ease-out ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 top-0 z-50 bg-[#eceff3]/85 pb-4 backdrop-blur-md transition duration-300 ease-out ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0"}`}
       >
         {children}
       </div>

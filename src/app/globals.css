@@ -40,6 +40,33 @@ body {
     linear-gradient(160deg, #f1f3f7, #e2e5eb);
 }
 
+/* Inside an app, the menu open: the app moves back inside the console's white frame, under the status bar. */
+.shell-content {
+  transition: padding 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.shell-content > * {
+  transition:
+    border-radius 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s ease-out;
+}
+
+html[data-shell-open] .shell-content {
+  padding: 5.75rem 1.25rem 1.25rem;
+}
+
+html[data-shell-open] .shell-content > * {
+  border-radius: 1.75rem;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(15, 20, 35, 0.22);
+}
+
+@media (min-width: 640px) {
+  html[data-shell-open] .shell-content {
+    padding: 6rem 2rem 2rem;
+  }
+}
+
 @keyframes tile-pulse {
   0%, 100% { box-shadow: 0 0 0 4px var(--accent), 0 0 18px 5px rgba(0, 180, 238, 0.5); }
   50% { box-shadow: 0 0 0 4px #7ddfff, 0 0 28px 9px rgba(0, 180, 238, 0.3); }

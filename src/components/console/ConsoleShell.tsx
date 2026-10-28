@@ -38,7 +38,8 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           </header>
         </ShellMenu>
       </Suspense>
-      <div className="flex flex-1 flex-col">{children}</div>
+      {/* Inside an app, opening the menu frames the app again (see .shell-content). */}
+      <div className="shell-content flex flex-1 flex-col">{children}</div>
       <Controls />
     </div>
   );
