@@ -3,12 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getApp } from "@/apps/registry";
 
-/** The app's name as page title and, for installable apps, their own manifest and home screen icon. */
+/** The page's title (the app's own, else its name) and, for installable apps, their manifest and home screen icon. */
 export async function generateMetadata({ params }: Pick<PageProps<"/apps/[slug]/[[...path]]">, "params">): Promise<Metadata> {
-  const app = getApp((await params).slug);
+  const { slug, path = [] } = await params;
+  const app = getApp(slug);
   if (!app) return {};
   return {
-    title: app.name,
+    title: app.title ? await app.title(path.map(decodeURIComponent)) : app.name,
     ...(app.pwa && {
       manifest: app.pwa.manifest,
       icons: { apple: app.pwa.appleIcon },

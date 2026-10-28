@@ -18,6 +18,8 @@ export type App = {
   accent: string;
   /** Optional square image for the home screen tile (path in public/). */
   cover?: string;
+  /** Title of the browser tab for a sub-page (`path` as in Page), e.g. "Octobre 2026 · Monnaie". Default: `name`. */
+  title?: (path: string[]) => string | Promise<string>;
   /** Server component rendering the app. Use `path` for sub-pages. */
   Page?: (props: AppPageProps) => ReactNode | Promise<ReactNode>;
   /** External app: the home tile opens this URL in a new tab instead of a page. */

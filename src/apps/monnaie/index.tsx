@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { App } from "../types";
 import { api } from "./api";
-import { MONTH_PATTERN, toDateString } from "./money";
+import { monthName, MONTH_PATTERN, toDateString } from "./money";
 import { readLedger } from "./server/store";
 import { VIEW_COOKIES } from "./server/view";
 import { GoalsView } from "./ui/GoalsView";
@@ -38,6 +38,32 @@ async function Page({ path }: { path: string[] }) {
   notFound();
 }
 
+/** "Octobre 2026 · Monnaie", "Réglages · Import · Monnaie"… The month and year shown are those of the page. */
+async function title(path: string[]): Promise<string> {
+  const [section, sub] = path;
+  await io();
+  const today = toDateString(new Date());
+  const jar = await cookies();
+  const name = (part: string) => `${part} · Monnaie`;
+  if (!section) {
+    const month = jar.get(VIEW_COOKIES.month)?.value;
+    const shown = month && MONTH_PATTERN.test(month) ? month : today.slice(0, 7);
+    const label = monthName(shown);
+    return name(`${label.charAt(0).toUpperCase()}${label.slice(1)} ${shown.slice(0, 4)}`);
+  }
+  if (section === "annee") {
+    const year = jar.get(VIEW_COOKIES.year)?.value;
+    return name(`${year && /^\d{4}$/.test(year) ? year : today.slice(0, 4)} · L'année`);
+  }
+  if (section === "lignes") return name("Lignes");
+  if (section === "objectifs") return name("Objectifs");
+  if (section === "reglages") {
+    const tab = SETTINGS_TABS.find((t) => t.key === (sub ?? ""));
+    return name(tab ? `Réglages · ${tab.label}` : "Réglages");
+  }
+  return "Monnaie";
+}
+
 const app: App = {
   slug: "monnaie",
   name: "Monnaie",
@@ -45,6 +71,7 @@ const app: App = {
   icon: "💸",
   accent: "linear-gradient(135deg, #11121a, #272935 60%, #ff7a2f)",
   Page,
+  title,
   api,
   pwa: { manifest: "/assets/monnaie/manifest.webmanifest", appleIcon: "/assets/monnaie/apple-touch-icon.png" },
 };
