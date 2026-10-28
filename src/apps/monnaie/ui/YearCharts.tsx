@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useTransition, type CSSProperties } from "react";
 import type { CategoryYear, DaySpending, LineDetail } from "../insights";
 import { formatMoney, formatSigned, monthName, monthShortName, type AccountLevels, type Cents } from "../money";
 import { openMonth } from "../server/actions";
@@ -99,6 +99,31 @@ function LinesCard({
   );
 }
 
+/**
+ * A set of ids kept in this browser's localStorage under `key` (the chart filters): the first render uses
+ * `initial` (same as the server), the saved choice comes right after; unavailable storage just forgets.
+ */
+function useStoredSet<T extends string>(key: string, initial: T[]) {
+  const [set, setSet] = useState<Set<T>>(() => new Set(initial));
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      // Read once, after hydration: the server can't know what this browser saved.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved) setSet(new Set(JSON.parse(saved) as T[]));
+    } catch {}
+    setLoaded(true);
+  }, [key]);
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(key, JSON.stringify([...set]));
+    } catch {}
+  }, [key, set, loaded]);
+  return [set, setSet] as const;
+}
+
 /** Toggle chip of a series, in the app's style. */
 function Chip({ on, color, label, onClick, dashed = false }: { on: boolean; color: string; label: string; onClick: () => void; dashed?: boolean }) {
   return (
@@ -120,7 +145,7 @@ function Chip({ on, color, label, onClick, dashed = false }: { on: boolean; colo
 
 /** 12 months: grouped bars and lines to pick, a card with every value on hover, a click opens the month. */
 export function YearFlowChart({ months, current }: { months: YearMonth[]; current?: string }) {
-  const [active, setActive] = useState<Set<SeriesKey>>(new Set(["income", "charges", "spent", "kept"]));
+  const [active, setActive] = useStoredSet<SeriesKey>("monnaie:year-series", ["income", "charges", "spent", "kept"]);
   const [hover, setHover] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   useBusy(pending);
@@ -251,29 +276,46 @@ export function YearFlowChart({ months, current }: { months: YearMonth[]; curren
   );
 }
 
-const ACCOUNT_COLORS = ["#e8e8ee", "var(--mn-yellow)", "#5ee08a", "#7cc4ff", "#c58cff", "#ff8fb8"];
+// Distinct hues (the orange accent is the total's): one per account, so no two curves look alike.
+const ACCOUNT_COLORS = ["#e8e8ee", "#fec83e", "#5ee08a", "#4fa3ff", "#c58cff", "#ff6fae", "#3ee0d0", "#b8e04a"];
 
 /**
  * Level of each account at the end of every month of the year, and their total. `months` starts with the
  * December before (the level at the start of the year); `levels` has one value per month of `months`.
  */
 export function AccountLevelsChart({ months, levels }: { months: string[]; levels: AccountLevels[] }) {
+  const [hidden, setHidden] = useStoredSet<string>("monnaie:accounts-hidden", []);
+  const accounts = levels.map((l, i) => ({ ...l, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length], total: false }));
+  const counted = accounts.filter((a) => !hidden.has(a.id));
   const series = [
-    ...levels.map((l, i) => ({ ...l, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length], total: false })),
+    ...accounts,
     {
       id: "total",
-      name: "Total",
+      name: counted.length === accounts.length ? "Total" : "Total affiché",
       emoji: "Σ",
       type: "courant" as const,
+      personal: true,
       color: "var(--mn-accent)",
       total: true,
-      // Unknown as soon as one account is unknown.
-      values: months.map((_, i) => (levels.every((l) => l.values[i] !== null) ? levels.reduce((n, l) => n + (l.values[i] ?? 0), 0) : null)),
+      // The accounts shown only; unknown as soon as one of them is unknown.
+      values: months.map((_, i) => (counted.every((l) => l.values[i] !== null) ? counted.reduce((n, l) => n + (l.values[i] ?? 0), 0) : null)),
     },
   ];
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Savings: the livrets and the business accounts, where money is kept. Everyday: the cards you pay with.
+  const isSavings = (a: (typeof accounts)[number]) => a.type === "livret" || !a.personal;
+  const views = [
+    { key: "all", label: "Tout", ids: accounts.map((a) => a.id) },
+    // A closed account (empty for months) only shows in "Tout".
+    { key: "savings", label: "Épargne", ids: accounts.filter((a) => !a.closed && isSavings(a)).map((a) => a.id) },
+    { key: "everyday", label: "Quotidien", ids: accounts.filter((a) => !a.closed && !isSavings(a)).map((a) => a.id) },
+  ];
+  const view = views.find((v) => accounts.every((a) => v.ids.includes(a.id) !== hidden.has(a.id)))?.key;
+  const showOnly = (ids: string[]) => setHidden(new Set(accounts.filter((a) => !ids.includes(a.id)).map((a) => a.id)));
   const [hover, setHover] = useState<number | null>(null);
+  // The account pointed at (chip or card): its curve stands out, the others fade.
+  const [focus, setFocus] = useState<string | null>(null);
   const shown = series.filter((s) => !hidden.has(s.id));
+  const faded = (id: string) => focus !== null && focus !== id;
   const W = 960;
   const H = 300;
   const PAD = 84;
@@ -288,15 +330,36 @@ export function AccountLevelsChart({ months, levels }: { months: string[]; level
       const next = new Set(set);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next.size < series.length ? next : set;
+      return accounts.some((a) => !next.has(a.id)) ? next : set;
     });
   const last = (s: (typeof series)[number]) => s.values.findLastIndex((v) => v !== null);
 
   return (
     <div className="grid gap-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex border-2 border-[var(--mn-ink)] bg-white" role="group" aria-label="Quels comptes">
+          {views.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => showOnly(v.ids)}
+              aria-pressed={view === v.key}
+              title={v.key === "savings" ? "Livrets et comptes pro : là où l'argent dort" : v.key === "everyday" ? "Les comptes avec lesquels tu paies" : "Tous les comptes"}
+              className={`mn-punch px-4 pb-1.5 pt-2.5 text-base transition ${view === v.key ? "bg-[var(--mn-ink)] text-[var(--mn-accent)]" : "text-[var(--mn-ink)] hover:bg-zinc-100"}`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-sm text-[var(--mn-muted)]">
+          {view === "savings" ? "Livrets et comptes pro : l'argent mis de côté." : view === "everyday" ? "Les comptes du quotidien, ceux avec lesquels tu paies." : "Ou choisis compte par compte ↓"}
+        </span>
+      </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Comptes affichés">
         {series.map((s) => (
-          <Chip key={s.id} on={!hidden.has(s.id)} color={s.color} label={`${s.emoji} ${s.name}`} dashed={s.total} onClick={() => toggle(s.id)} />
+          <span key={s.id} onPointerEnter={() => setFocus(s.id)} onPointerLeave={() => setFocus(null)}>
+            <Chip on={!hidden.has(s.id)} color={s.color} label={`${s.emoji} ${s.name}`} dashed={s.total} onClick={() => toggle(s.id)} />
+          </span>
         ))}
       </div>
       <div className="relative">
@@ -324,13 +387,13 @@ export function AccountLevelsChart({ months, levels }: { months: string[]; level
           {shown.map((s) => {
             const points = s.values.slice(1).flatMap((v, i) => (v === null ? [] : [[x(i), y(v)] as const]));
             return (
-              <g key={`${s.id}-${hidden.size}`} pointerEvents="none">
+              <g key={`${s.id}-${hidden.size}`} pointerEvents="none" className="transition-opacity duration-200" opacity={faded(s.id) ? 0.12 : 1}>
                 <path
                   d={points.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`).join("")}
                   pathLength={1}
                   fill="none"
                   stroke={s.color}
-                  strokeWidth={s.total ? 3 : 3.5}
+                  strokeWidth={focus === s.id ? 6 : s.total ? 3 : 3.5}
                   strokeDasharray={s.total ? "2 7" : undefined}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -379,12 +442,24 @@ export function AccountLevelsChart({ months, levels }: { months: string[]; level
           const start = s.values[0];
           const value = end >= 0 ? s.values[end] : null;
           return (
-            <li key={s.id} className="mn-shape grid gap-1 px-4 py-3" style={{ "--mn-shape": s.total ? "var(--mn-ink)" : "var(--mn-panel-2)" } as CSSProperties}>
-              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--mn-muted)]">
-                <span className="h-2.5 w-2.5" style={{ background: s.color }} aria-hidden />
+            <li
+              key={s.id}
+              onPointerEnter={() => setFocus(s.id)}
+              onPointerLeave={() => setFocus(null)}
+              onClick={() => toggle(s.id)}
+              title={hidden.has(s.id) ? "Afficher la courbe" : "Masquer la courbe"}
+              className={`mn-shape grid cursor-pointer gap-1 py-3 pl-6 pr-4 transition ${hidden.has(s.id) ? "opacity-40" : ""} ${focus === s.id ? "-translate-y-0.5" : ""}`}
+              style={{ "--mn-shape": s.total ? "var(--mn-ink)" : "var(--mn-panel-2)" } as CSSProperties}
+            >
+              {/* The curve's color, as a thick band down the card. */}
+              <span aria-hidden className="absolute bottom-2 left-1.5 top-2 w-2" style={{ background: s.total ? `repeating-linear-gradient(${s.color} 0 6px, transparent 6px 10px)` : s.color }} />
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: s.color }}>
                 {s.emoji} {s.name}
               </span>
-              <span className="mn-punch text-2xl">{value === null ? "—" : formatMoney(value)}</span>
+              <span className="flex items-end justify-between gap-3">
+                <span className="mn-punch text-2xl">{value === null ? "—" : formatMoney(value)}</span>
+                <Spark values={s.values.slice(1)} color={s.color} />
+              </span>
               <span className="text-sm text-[var(--mn-muted)]">
                 {value !== null && start !== null ? (
                   <>
@@ -715,5 +790,19 @@ function WhereItGoes({ top }: { top: CategoryYear["top"] }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** The account's year as a tiny curve in its color, to tie the card to its line on the chart. */
+function Spark({ values, color }: { values: (number | null)[]; color: string }) {
+  const known = values.map((v, i) => [i, v] as const).filter((p): p is readonly [number, number] => p[1] !== null);
+  if (known.length < 2) return null;
+  const nums = known.map(([, v]) => v);
+  const [min, max] = [Math.min(...nums), Math.max(...nums)];
+  const points = known.map(([i, v]) => `${((i / 11) * 70).toFixed(1)},${(22 - ((v - min) / (max - min || 1)) * 18).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox="0 0 70 26" className="h-7 w-20 shrink-0" aria-hidden>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

@@ -583,7 +583,16 @@ export function checkpointChecks(ledger: Ledger): { checkpoint: Checkpoint; expe
 }
 
 /** Level of one account at the end of each month asked; null when unknown (no balance checkpoint, future). */
-export type AccountLevels = { id: string; name: string; emoji: string; type: "courant" | "livret"; personal: boolean; values: (Cents | null)[] };
+export type AccountLevels = {
+  id: string;
+  name: string;
+  emoji: string;
+  type: "courant" | "livret";
+  personal: boolean;
+  /** Empty and without any line for 6 months: an account that was closed. */
+  closed: boolean;
+  values: (Cents | null)[];
+};
 
 /**
  * The level of every account at the end of each month of `months` ("YYYY-MM", in order): the main current account
@@ -596,13 +605,24 @@ export function accountLevels(ledger: Ledger, months: string[], today: string): 
   const savingsAt = (end: string, livret: string) =>
     ledger.entries.reduce((n, e) => (e.kind === "savings" && (e.livret ?? "") === livret && e.date <= end ? n + savingsDelta(e) : n), 0);
   const flowAt = (end: string, account: string) => ledger.entries.reduce((n, e) => (balanceDate(e) <= end ? n + accountFlow(e, account) : n), 0);
+  // Closed: nothing on it now, and no line for 6 months (a livret emptied then closed, an old bank).
+  const sixMonthsAgo = `${shiftMonth(monthOf(today), -6)}-01`;
+  const closed = (id: string, livret: boolean, balance: Cents) =>
+    balance === 0 && !ledger.entries.some((e) => (livret ? e.livret === id : accountOf(e) === id || e.to === id) && e.date >= sixMonthsAgo);
+  const now = (values: (Cents | null)[]) => values.findLast((v) => v !== null) ?? 0;
   const levels: AccountLevels[] = [
-    { ...MAIN_ACCOUNT, type: "courant", values: ends.map((end, i) => (known(i) ? accountBalanceAt(ledger, end > today ? today : end) : null)) },
-    ...ledger.accounts.map((a) => ({ ...a, type: "courant" as const, values: ends.map((end, i) => (known(i) ? (a.start ?? 0) + flowAt(end, a.id) : null)) })),
-    ...ledger.savingsAccounts.map((a) => ({ ...a, type: "livret" as const, personal: true, values: ends.map((end, i) => (known(i) ? (a.start ?? 0) + savingsAt(end, a.id) : null)) })),
+    { ...MAIN_ACCOUNT, type: "courant", closed: false, values: ends.map((end, i) => (known(i) ? accountBalanceAt(ledger, end > today ? today : end) : null)) },
+    ...ledger.accounts.map((a) => {
+      const values = ends.map((end, i) => (known(i) ? (a.start ?? 0) + flowAt(end, a.id) : null));
+      return { ...a, type: "courant" as const, closed: closed(a.id, false, now(values)), values };
+    }),
+    ...ledger.savingsAccounts.map((a) => {
+      const values = ends.map((end, i) => (known(i) ? (a.start ?? 0) + savingsAt(end, a.id) : null));
+      return { ...a, type: "livret" as const, personal: true, closed: closed(a.id, true, now(values)), values };
+    }),
   ];
   const loose = ends.map((end, i) => (known(i) ? ledger.settings.savingsStart + savingsAt(end, "") : null));
-  if (loose.some((v) => v)) levels.push({ id: "", name: "Épargne sans livret", emoji: "🪙", type: "livret", personal: true, values: loose });
+  if (loose.some((v) => v)) levels.push({ id: "", name: "Épargne sans livret", emoji: "🪙", type: "livret", personal: true, closed: false, values: loose });
   return levels;
 }
 

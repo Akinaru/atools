@@ -27,7 +27,7 @@ import { MonthCompareChart } from "./MonthCompareChart";
 import { EntryDialog } from "./EntryDialog";
 import { JournalBrowser } from "./JournalBrowser";
 import { ActionButton, AnimatedMoney } from "./motion";
-import { ViewNav } from "./ViewNav";
+import { BarFigure, ViewNav } from "./ViewNav";
 import { BASE, buttonClass, Diamond, Panel, PanelTitle, Paper, Screen, Slab, Stamp, Tag } from "./kit";
 
 /** Dashboard of one month. `today` is YYYY-MM-DD. */
@@ -83,6 +83,16 @@ export function MonthView({ ledger, month, today }: { ledger: Ledger; month: str
             isToday={isCurrent}
             prevLabel="Mois précédent"
             nextLabel="Mois suivant"
+            todayLabel="Ce mois-ci"
+            title={`${monthName(month)} ${month.slice(0, 4)}`}
+            summary={
+              <>
+                <BarFigure label="Gardé" value={formatSigned(stats.kept)} tone={stats.kept < 0 ? "var(--mn-red)" : "#5ee08a"} />
+                <BarFigure label="Encaissé" value={formatMoney(stats.income)} />
+                <BarFigure label="Plaisir" value={formatMoney(stats.spent)} tone="var(--mn-accent)" />
+                {balance !== null && <BarFigure label="Solde" value={formatMoney(balance)} tone={balance < 0 ? "var(--mn-red)" : undefined} />}
+              </>
+            }
           />
           <EntryDialog categories={categories} names={accountNamesOf(ledger)} defaultDate={defaultDate} hotkey people={people} />
         </>

@@ -5,7 +5,7 @@ import { showYear } from "../server/actions";
 import { Panel, PanelTitle, Paper, Screen, Stamp, Tag } from "./kit";
 import { EntryEditor } from "./EntryEditor";
 import { AnimatedMoney } from "./motion";
-import { ViewNav } from "./ViewNav";
+import { BarFigure, ViewNav } from "./ViewNav";
 import { AccountLevelsChart, CategoryExplorer, SpendingCalendar, YearFlowChart, type YearMonth } from "./YearCharts";
 
 /** Overview of a year: what was kept, the months, the categories, the days. `today` is YYYY-MM-DD. */
@@ -52,6 +52,17 @@ export function YearView({ ledger, year, today }: { ledger: Ledger; year: number
           isToday={year === Number(today.slice(0, 4))}
           prevLabel={`Année ${year - 1}`}
           nextLabel={`Année ${year + 1}`}
+          todayLabel="Cette année"
+          title={year}
+          summary={
+            <>
+              <BarFigure label="Gardé" value={formatSigned(stats.kept)} tone={stats.kept < 0 ? "var(--mn-red)" : "#5ee08a"} />
+              <BarFigure label="Encaissé" value={formatMoney(stats.income)} />
+              <BarFigure label="Charges" value={formatMoney(stats.charges)} tone="var(--mn-muted)" />
+              <BarFigure label="Plaisir" value={formatMoney(stats.spent)} tone="var(--mn-accent)" />
+              <BarFigure label="Épargne" value={formatSigned(stats.saved)} tone="var(--mn-yellow)" />
+            </>
+          }
         />
       }
     >

@@ -70,6 +70,7 @@ const app: App = {
   description: "Ce que je gagne, ce que je crame pour le plaisir, et ce qu'il me reste. Mois par mois.",
   icon: "💸",
   accent: "linear-gradient(135deg, #11121a, #272935 60%, #ff7a2f)",
+  cover: "/assets/monnaie/tile.svg",
   Page,
   title,
   api,
